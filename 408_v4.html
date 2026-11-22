@@ -1,0 +1,3150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>考研数学与408薄弱点遗忘追踪表 v4 & 每日待办</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #f4f7fb;
+      background-image:
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.09) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.08) 0px, transparent 48%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: #0f172a;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 磨砂玻璃顶栏 */
+    .glass-topbar {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    /* 大卡片网格布局 */
+    .knowledge-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+      gap: 20px;
+    }
+
+    /* 知识点大卡片悬浮与动效 */
+    .k-card {
+      position: relative;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 18px;
+      padding: 22px 24px 20px 28px;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.03);
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease;
+      overflow: hidden;
+      animation: cardEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: calc(var(--stagger, 0) * 45ms);
+    }
+
+    .k-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 32px -8px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(15, 23, 42, 0.05);
+      border-color: rgba(147, 197, 253, 0.85);
+    }
+
+    /* 左侧状态色条 */
+    .k-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      border-radius: 18px 0 0 18px;
+      background: var(--accent-color, #2563eb);
+      transition: width 0.2s ease;
+    }
+
+    .k-card:hover::before {
+      width: 7px;
+    }
+
+    .k-card.accent-danger { --accent-color: linear-gradient(180deg, #ef4444, #dc2626); }
+    .k-card.accent-warning { --accent-color: linear-gradient(180deg, #f59e0b, #d97706); }
+    .k-card.accent-success { --accent-color: linear-gradient(180deg, #22c55e, #16a34a); }
+
+    /* 统计卡片悬浮与入场 */
+    .stat-card {
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+      animation: cardEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: calc(var(--stagger, 0) * 50ms);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.09);
+    }
+
+    /* 待办日期分组卡片 */
+    .todo-date-group {
+      animation: cardEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: calc(var(--stagger, 0) * 55ms);
+      transition: box-shadow 0.25s ease;
+    }
+
+    .todo-date-group:hover {
+      box-shadow: 0 10px 26px -8px rgba(15, 23, 42, 0.08);
+    }
+
+    /* 按钮微交互 */
+    .btn-tactile {
+      transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+    .btn-tactile:active {
+      transform: scale(0.95);
+    }
+
+    /* 视图切换动画 */
+    .view-section {
+      display: none;
+    }
+    .view-section.active {
+      display: block;
+      animation: fadeSlideUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes cardEnter {
+      from { opacity: 0; transform: translateY(14px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* 遗忘+1与完成弹跳动效 */
+    @keyframes popBounce {
+      0% { transform: scale(1); }
+      35% { transform: scale(1.32); }
+      65% { transform: scale(0.92); }
+      100% { transform: scale(1); }
+    }
+
+    .animate-pop {
+      animation: popBounce 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* 弹窗弹簧动效与背景模糊 */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-panel {
+      animation: springIn 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes springIn {
+      from { opacity: 0; transform: scale(0.9) translateY(14px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Toast 动效 */
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(28px) scale(0.95); }
+      to { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateX(0) scale(1); }
+      to { opacity: 0; transform: translateX(24px) scale(0.95); }
+    }
+
+    .toast-item {
+      animation: toastIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .toast-item.hiding {
+      animation: toastOut 0.24s ease forwards;
+    }
+
+    /* 未保存红点脉冲 */
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.45); opacity: 0.65; }
+    }
+    .dirty-pulse {
+      animation: pulseDot 1.6s infinite ease-in-out;
+    }
+
+    /* 隐藏滚动条美化 */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* ========== Markdown 备注（编辑器 Tab / 渲染样式） ========== */
+    .md-tab-btn {
+      padding: 3px 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      transition: color .15s ease, background-color .15s ease, box-shadow .15s ease;
+    }
+    .md-tab-btn:hover { color: #334155; }
+    .md-tab-btn.md-tab-active {
+      background: #fff;
+      color: #1d4ed8;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+    .md-tool {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px 8px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+    }
+    .md-tool:hover { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+
+    .md-body { line-height: 1.75; word-break: break-word; overflow-wrap: anywhere; }
+    .md-body .md-p { margin: 0 0 .55em; }
+    .md-body .md-p:last-child { margin-bottom: 0; }
+    .md-body .md-h { font-weight: 700; line-height: 1.4; color: #0f172a; margin: .8em 0 .35em; }
+    .md-body .md-h:first-child { margin-top: 0; }
+    .md-body .md-h1 { font-size: 1.22em; padding-bottom: .2em; border-bottom: 1px solid #e2e8f0; }
+    .md-body .md-h2 { font-size: 1.12em; }
+    .md-body .md-h3 { font-size: 1.04em; }
+    .md-body .md-h4, .md-body .md-h5, .md-body .md-h6 { font-size: 1em; }
+    .md-body .md-list { margin: .35em 0 .6em; padding-left: 1.55em; }
+    .md-body ul.md-list { list-style: disc; }
+    .md-body ol.md-list { list-style: decimal; }
+    .md-body .md-list .md-list { margin: .1em 0; }
+    .md-body li { margin: .22em 0; }
+    .md-body li::marker { color: #94a3b8; }
+    .md-body .md-code {
+      background: rgba(99, 102, 241, .1);
+      border-radius: 5px;
+      padding: .12em .42em;
+      font-size: .87em;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace;
+      color: #4338ca;
+    }
+    .md-body .md-pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      overflow-x: auto;
+      margin: .55em 0;
+      font-size: .85em;
+      line-height: 1.6;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Courier New", monospace;
+    }
+    .md-body .md-pre code { background: none; color: inherit; padding: 0; font-size: 1em; }
+    .md-body .md-quote {
+      border-left: 3px solid #93c5fd;
+      background: rgba(239, 246, 255, .7);
+      border-radius: 0 9px 9px 0;
+      padding: 7px 13px;
+      margin: .45em 0;
+      color: #475569;
+    }
+    .md-body .md-hr { border: none; border-top: 1px dashed #cbd5e1; margin: .85em 0; }
+    .md-body a { color: #2563eb; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+    .md-body a:hover { color: #1d4ed8; }
+    .md-body del { color: #94a3b8; }
+    .md-body .md-table {
+      border-collapse: collapse;
+      margin: .55em 0;
+      font-size: .92em;
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .md-body .md-table th, .md-body .md-table td { border: 1px solid #e2e8f0; padding: 4px 11px; }
+    .md-body .md-table th { background: #f1f5f9; font-weight: 600; }
+    .md-body .md-table tr:nth-child(even) td { background: rgba(248, 250, 252, .6); }
+    /* 表格视图中的紧凑渲染 */
+    .md-compact { font-size: 12px; line-height: 1.65; }
+    .md-compact .md-h { margin: .45em 0 .2em; }
+    .md-compact .md-h1 { border-bottom: none; }
+    .md-compact .md-p { margin-bottom: .35em; }
+    .md-compact .md-quote { padding: 4px 10px; }
+    .md-compact .md-pre { padding: 8px 11px; }
+    .md-compact .md-table { white-space: normal; }
+    /* ========== 备注分屏实时渲染 ========== */
+    .rec-note-flex.md-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
+    .rec-note-flex.md-split > * { min-width: 0; }
+    @media (max-width: 640px) { .rec-note-flex.md-split { grid-template-columns: 1fr; } }
+    #recordModalPanel { transition: max-width .28s cubic-bezier(0.22, 1, 0.36, 1); }
+    #recordModalPanel.md-wide { max-width: 56rem; }
+    /* ========== 卡片放大查看（FLIP 动画由 JS 驱动 transform） ========== */
+    .viewer-panel { opacity: 0; will-change: transform, opacity; }
+    /* ========== KaTeX 数学公式 ========== */
+    .md-body .md-math-display {
+      display: block;
+      text-align: center;
+      margin: .45em 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+  </style>
+  <!-- KaTeX 数学公式渲染（CDN，加载失败时降级显示原始 TeX 文本） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="if(window.renderMathAll)window.renderMathAll()"></script>
+</head>
+<body class="min-h-screen pb-16 selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- ==================== 顶部导航栏（磨砂玻璃） ==================== -->
+  <header class="glass-topbar sticky top-0 z-40 border-b border-slate-200/80 shadow-sm">
+    <div class="max-w-[1380px] mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white flex items-center justify-center font-extrabold text-lg shadow-md shadow-blue-500/25">
+          研
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">考研数学与408薄弱点遗忘追踪表</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">v4</span>
+          </div>
+          <p class="text-xs text-slate-500">IndexedDB 主库 + 自动快照 + 本地 JSON 双向同步</p>
+        </div>
+      </div>
+
+      <!-- 存储状态与操作按钮区 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- 同步状态徽章 -->
+        <span id="syncBadge" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 transition-all">
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="syncText">IndexedDB 本地库</span>
+        </span>
+
+        <!-- 一键恢复文件句柄权限按钮（刷新后有已保存句柄时出现） -->
+        <button id="reconnectBtn" onclick="reconnectLocalJson()" class="hidden btn-tactile inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 shadow-sm">
+          🔄 恢复文件同步
+        </button>
+
+        <!-- 自动写盘开关（绑定本地JSON后可用） -->
+        <label id="autoSyncWrap" class="hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-emerald-50/80 text-emerald-700 border border-emerald-200 cursor-pointer select-none" title="开启后每次修改将自动写入绑定的本地 JSON 文件">
+          <input type="checkbox" id="autoSyncToggle" class="accent-emerald-600 w-3.5 h-3.5 rounded cursor-pointer" onchange="toggleAutoSync(this.checked)" />
+          <span>自动写盘</span>
+        </label>
+
+        <!-- 手动保存主按钮（支持 Ctrl+S） -->
+        <button id="manualSaveBtn" onclick="manualSave()" title="立即写入 IndexedDB、生成历史快照并同步本地 JSON (Ctrl+S)"
+          class="btn-tactile relative inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20">
+          <span id="dirtyDot" class="hidden w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white dirty-pulse"></span>
+          <span id="manualSaveIcon">💾</span>
+          <span id="manualSaveText">手动保存</span>
+          <kbd class="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-medium bg-white/20 rounded-md text-white/90">Ctrl+S</kbd>
+        </button>
+
+        <!-- 历史快照 -->
+        <button onclick="openSnapshotModal()" class="btn-tactile inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-xs">
+          🕒 历史快照
+          <span id="snapshotCountBadge" class="px-1.5 py-0.2 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600">0</span>
+        </button>
+
+        <!-- 绑定本地 JSON -->
+        <button onclick="bindLocalJson()" title="绑定本地 JSON 文件，支持直接读写"
+          class="btn-tactile inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-slate-700 border border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 shadow-xs">
+          📂 绑定本地JSON
+        </button>
+
+        <!-- 导入 / 导出 -->
+        <button onclick="document.getElementById('importFileInput').click()" class="btn-tactile inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-xs">
+          📥 导入
+        </button>
+        <button onclick="exportJson()" class="btn-tactile inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-xs">
+          📤 导出JSON
+        </button>
+        <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="handleImportFile(event)" />
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== 3 标签页导航栏 ==================== -->
+  <nav class="max-w-[1380px] mx-auto px-4 sm:px-6 mt-5">
+    <div class="inline-flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/85 backdrop-blur border border-slate-200/80 shadow-sm overflow-x-auto max-w-full no-scrollbar">
+      <button class="tab-btn active btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="math" onclick="switchTab('math')">
+        <span>📐 考研数学</span>
+        <span id="tabCount-math" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+      </button>
+      <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="408" onclick="switchTab('408')">
+        <span>💻 408 专业课</span>
+        <span id="tabCount-408" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+      </button>
+      <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="todo" onclick="switchTab('todo')">
+        <span>📅 每日待办</span>
+        <span id="tabCount-todo" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+      </button>
+      <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="paper" onclick="switchTab('paper')">
+        <span>📝 套卷记录</span>
+        <span id="tabCount-paper" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== 主内容区 ==================== -->
+  <main class="max-w-[1380px] mx-auto px-4 sm:px-6 mt-5">
+
+    <!-- ==================== VIEW 1: 考研数学 ==================== -->
+    <section id="view-math" class="view-section active">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-math"></div>
+
+      <!-- 工具栏 -->
+      <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <select id="filter-subject-math" onchange="onRecordFilterChange('math')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none"></select>
+          <select id="filter-status-math" onchange="onRecordFilterChange('math')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+            <option value="">全部状态</option>
+            <option value="待解决">待解决</option>
+            <option value="复习中">复习中</option>
+            <option value="已掌握">已掌握</option>
+          </select>
+          <select id="sort-math" onchange="onRecordFilterChange('math')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+            <option value="forgetDesc">按遗忘次数 ↓</option>
+            <option value="dateDesc">按最近日期 ↓</option>
+            <option value="firstDateDesc">按首次日期 ↓</option>
+          </select>
+          <div class="relative">
+            <input type="text" id="search-math" placeholder="搜索知识点 / 来源 / 备注..." oninput="onRecordFilterChange('math')"
+              class="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none transition-all" />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <!-- 视图切换：大卡片 / 紧凑表格 -->
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200/80">
+            <button id="viewBtn-math-card" onclick="setViewMode('math', 'card')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">🗂️ 大卡片</button>
+            <button id="viewBtn-math-table" onclick="setViewMode('math', 'table')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">📋 紧凑表格</button>
+          </div>
+          <button onclick="openRecordModal('math')" class="btn-tactile inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20">
+            ＋ 新增数学薄弱点
+          </button>
+        </div>
+      </div>
+
+      <!-- 数学内容容器（大卡片或表格） -->
+      <div id="records-container-math"></div>
+      <div id="pagination-math" class="mt-4"></div>
+    </section>
+
+    <!-- ==================== VIEW 2: 408 专业课 ==================== -->
+    <section id="view-408" class="view-section">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-408"></div>
+
+      <!-- 工具栏 -->
+      <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <select id="filter-subject-408" onchange="onRecordFilterChange('408')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none"></select>
+          <select id="filter-status-408" onchange="onRecordFilterChange('408')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+            <option value="">全部状态</option>
+            <option value="待解决">待解决</option>
+            <option value="复习中">复习中</option>
+            <option value="已掌握">已掌握</option>
+          </select>
+          <select id="sort-408" onchange="onRecordFilterChange('408')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+            <option value="forgetDesc">按遗忘次数 ↓</option>
+            <option value="dateDesc">按最近日期 ↓</option>
+            <option value="firstDateDesc">按首次日期 ↓</option>
+          </select>
+          <div class="relative">
+            <input type="text" id="search-408" placeholder="搜索知识点 / 来源 / 备注..." oninput="onRecordFilterChange('408')"
+              class="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none transition-all" />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200/80">
+            <button id="viewBtn-408-card" onclick="setViewMode('408', 'card')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">🗂️ 大卡片</button>
+            <button id="viewBtn-408-table" onclick="setViewMode('408', 'table')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">📋 紧凑表格</button>
+          </div>
+          <button onclick="openRecordModal('408')" class="btn-tactile inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20">
+            ＋ 新增408薄弱点
+          </button>
+        </div>
+      </div>
+
+      <!-- 408 内容容器 -->
+      <div id="records-container-408"></div>
+      <div id="pagination-408" class="mt-4"></div>
+    </section>
+
+    <!-- ==================== VIEW 3: 每日待办 ==================== -->
+    <section id="view-todo" class="view-section">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-todo"></div>
+
+      <!-- 快速添加待办 -->
+      <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 sm:p-5 mb-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
+          <input type="date" id="quick-todo-date" title="任务日期"
+            class="lg:col-span-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          <input type="text" id="quick-todo-title" placeholder="输入今日待办事项（例如：刷完李六卷3、复盘Cache写回策略），按回车快速添加..."
+            onkeydown="if(event.key==='Enter') quickAddTodo()"
+            class="sm:col-span-2 lg:col-span-4 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          <select id="quick-todo-cat" class="lg:col-span-1 px-2.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+            <option value="数学">数学</option>
+            <option value="408">408</option>
+            <option value="英语">英语</option>
+            <option value="政治">政治</option>
+            <option value="综合">综合</option>
+          </select>
+          <select id="quick-todo-priority" class="lg:col-span-1 px-2.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+            <option value="高">高优</option>
+            <option value="中" selected>中优</option>
+            <option value="低">低优</option>
+          </select>
+          <input type="text" id="quick-todo-note" placeholder="备注（可选）" onkeydown="if(event.key==='Enter') quickAddTodo()"
+            class="lg:col-span-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+          <button onclick="quickAddTodo()" class="lg:col-span-2 btn-tactile w-full py-2.5 px-4 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20">
+            ＋ 添加待办
+          </button>
+        </div>
+      </div>
+
+      <!-- 待办筛选工具栏 -->
+      <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button id="todo-sort-btn" onclick="toggleTodoDateSort()" class="btn-tactile px-3.5 py-2 rounded-xl text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">
+            📅 按日期降序（最新在前）↓
+          </button>
+          <select id="filter-todo-status" onchange="renderTodos()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white outline-none">
+            <option value="all">全部状态</option>
+            <option value="pending">仅看未完成</option>
+            <option value="done">仅看已完成</option>
+          </select>
+          <select id="filter-todo-cat" onchange="renderTodos()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white outline-none">
+            <option value="">全部分类</option>
+            <option value="数学">数学</option>
+            <option value="408">408</option>
+            <option value="英语">英语</option>
+            <option value="政治">政治</option>
+            <option value="综合">综合</option>
+          </select>
+          <input type="date" id="filter-todo-date" onchange="renderTodos()" title="按指定日期筛选"
+            class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white outline-none" />
+          <button onclick="clearTodoFilters()" class="btn-tactile px-3 py-2 rounded-xl text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">
+            重置筛选
+          </button>
+        </div>
+        <div class="relative">
+          <input type="text" id="search-todo" placeholder="搜索待办内容 / 备注..." oninput="renderTodos()"
+            class="w-full sm:w-52 pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+        </div>
+      </div>
+
+      <!-- 按日期分组的待办列表 -->
+      <div id="todo-groups-container" class="space-y-4"></div>
+    </section>
+
+    <!-- ==================== VIEW 4: 套卷记录 ==================== -->
+    <section id="view-paper" class="view-section">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-paper"></div>
+
+      <!-- 工具栏 -->
+      <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <select id="filter-paper-mod" onchange="renderPapers()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+            <option value="">全部科目</option>
+            <option value="math">考研数学</option>
+            <option value="408">408 专业课</option>
+          </select>
+          <select id="filter-paper-cat" onchange="renderPapers()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none"></select>
+          <select id="sort-paper" onchange="renderPapers()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+            <option value="dateDesc">按日期 ↓</option>
+            <option value="scoreDesc">按总分 ↓</option>
+            <option value="scoreAsc">按总分 ↑</option>
+          </select>
+          <div class="relative">
+            <input type="text" id="search-paper" placeholder="搜索卷名 / 错误点 / 备注..." oninput="renderPapers()"
+              class="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          </div>
+        </div>
+        <button onclick="openPaperModal()" class="btn-tactile inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20">
+          ＋ 新增套卷
+        </button>
+      </div>
+
+      <!-- 套卷卡片容器 -->
+      <div id="papers-container"></div>
+    </section>
+  </main>
+
+  <!-- ==================== MODAL 1: 薄弱点编辑 / 新增 ==================== -->
+  <div id="recordModal" class="modal-backdrop" onclick="if(event.target===this) closeRecordModal()">
+    <div id="recordModalPanel" class="modal-panel bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 id="recordModalTitle" class="text-base font-bold text-slate-900">新增薄弱点</h3>
+        <button onclick="closeRecordModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <input type="hidden" id="rec-module" />
+        <input type="hidden" id="rec-id" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">科目</label>
+            <select id="rec-subject" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">错误类型</label>
+            <select id="rec-type" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+              <option value="知识缺失">知识缺失</option>
+              <option value="理解错误">理解错误</option>
+              <option value="思路卡壳">思路卡壳</option>
+              <option value="计算失误">计算失误</option>
+              <option value="概念混淆">概念混淆</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">知识点 / 题目名称 *</label>
+          <input type="text" id="rec-topic" placeholder="例如：27|李六|物理应用 或 Cache 的写回策略"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">来源</label>
+            <input type="text" id="rec-source" list="source-suggestions" placeholder="例如：模拟卷 / 真题 / 模拟题"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+            <datalist id="source-suggestions">
+              <option value="模拟卷"></option>
+              <option value="真题"></option>
+              <option value="模拟题"></option>
+              <option value="强化课"></option>
+              <option value="王道单科书"></option>
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">当前状态</label>
+            <select id="rec-status" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+              <option value="待解决">待解决</option>
+              <option value="复习中">复习中</option>
+              <option value="已掌握">已掌握</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">遗忘次数</label>
+            <input type="number" min="1" id="rec-forgetCount" value="1"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">最近日期</label>
+            <input type="date" id="rec-date"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold text-slate-500">备注 / 反思
+              <span class="ml-1 align-middle text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md" title="支持 Markdown 语法">Markdown</span>
+            </label>
+            <div class="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+              <button type="button" id="rec-note-tab-edit" onclick="recNoteSwitchTab('edit')"
+                class="md-tab-btn">✍️ 编辑</button>
+              <button type="button" id="rec-note-tab-split" onclick="recNoteSwitchTab('split')"
+                class="md-tab-btn" title="左边写，右边实时渲染">⇔ 分屏</button>
+              <button type="button" id="rec-note-tab-preview" onclick="recNoteSwitchTab('preview')"
+                class="md-tab-btn">👁️ 预览</button>
+            </div>
+          </div>
+          <div id="rec-note-toolbar" class="flex flex-wrap items-center gap-1 mb-2">
+            <button type="button" onclick="recNoteWrapSel('**','**','加粗文字')" title="加粗（Ctrl+B）" class="md-tool font-bold">B</button>
+            <button type="button" onclick="recNoteWrapSel('*','*','斜体文字')" title="斜体（Ctrl+I）" class="md-tool italic font-serif">I</button>
+            <button type="button" onclick="recNoteWrapSel('~~','~~','删除文字')" title="删除线" class="md-tool line-through">S</button>
+            <button type="button" onclick="recNoteWrapSel('`','`','代码')" title="行内代码" class="md-tool font-mono text-[11px]">&lt;code&gt;</button>
+            <span class="w-px h-4 bg-slate-200 mx-0.5"></span>
+            <button type="button" onclick="recNotePrefixLines('## ')" title="标题" class="md-tool font-bold">H</button>
+            <button type="button" onclick="recNotePrefixLines('- ')" title="无序列表" class="md-tool">• 列表</button>
+            <button type="button" onclick="recNotePrefixLines('', true)" title="有序列表" class="md-tool">1. 序号</button>
+            <button type="button" onclick="recNotePrefixLines('> ')" title="引用" class="md-tool">❝ 引用</button>
+            <span class="w-px h-4 bg-slate-200 mx-0.5"></span>
+            <button type="button" onclick="recNoteWrapSel('$', '$', '\\log_2 n')" title="行内公式 $...$（LaTeX）" class="md-tool">∑ 公式</button>
+            <button type="button" onclick="recNoteInsert('\n$$\n\\frac{a}{b}\n$$\n')" title="独立公式块 $$...$$（LaTeX）" class="md-tool">∑∑ 公式块</button>
+            <button type="button" onclick="recNoteWrapSel('[', '](https://)', '链接文字')" title="插入链接" class="md-tool">🔗 链接</button>
+            <button type="button" onclick="recNoteInsert('\n| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n')" title="插入表格" class="md-tool">▦ 表格</button>
+            <button type="button" onclick="recNoteInsert('\n```\n代码块\n```\n')" title="插入代码块" class="md-tool">{ } 代码块</button>
+          </div>
+          <div id="rec-note-flex" class="rec-note-flex">
+            <textarea id="rec-note" rows="7" onkeydown="recNoteKeydown(event)" oninput="recNoteLivePreview()" placeholder="记录为什么错、核心公式/结论是什么、下次怎么避坑...&#10;&#10;支持 Markdown：**加粗**、*斜体*、`代码`、## 标题、- 列表、> 引用、[链接](url)、表格&#10;数学公式：行内 $\\log_2 n$、独立块 $$E=mc^2$$"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm leading-relaxed focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+            <div id="rec-note-preview" class="hidden md-body w-full px-3.5 py-3 rounded-xl border border-slate-200 bg-slate-50/60 text-sm text-slate-700 min-h-[9.5rem] max-h-80 overflow-y-auto"></div>
+          </div>
+        </div>
+        <div id="rec-forget-history-wrap" class="hidden">
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">遗忘轨迹（每次 +1 自动记录时间）</label>
+          <div id="rec-forget-history" class="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-xs text-slate-600 space-y-1 max-h-36 overflow-y-auto"></div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
+        <button onclick="closeRecordModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button onclick="saveRecordModal()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">保存记录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2: 每日待办编辑 ==================== -->
+  <div id="todoModal" class="modal-backdrop" onclick="if(event.target===this) closeTodoModal()">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 class="text-base font-bold text-slate-900">编辑待办事项</h3>
+        <button onclick="closeTodoModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <input type="hidden" id="edit-todo-id" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">日期 *</label>
+            <input type="date" id="edit-todo-date" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">分类</label>
+            <select id="edit-todo-cat" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none">
+              <option value="数学">数学</option>
+              <option value="408">408</option>
+              <option value="英语">英语</option>
+              <option value="政治">政治</option>
+              <option value="综合">综合</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">待办内容 *</label>
+          <input type="text" id="edit-todo-title" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">优先级</label>
+            <select id="edit-todo-priority" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none">
+              <option value="高">高</option>
+              <option value="中">中</option>
+              <option value="低">低</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">完成状态</label>
+            <select id="edit-todo-completed" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none">
+              <option value="false">未完成</option>
+              <option value="true">已完成</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">备注</label>
+          <textarea id="edit-todo-note" rows="3" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none resize-y"></textarea>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
+        <button onclick="closeTodoModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button onclick="saveTodoModal()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">保存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2.5: 套卷编辑 / 新增 ==================== -->
+  <div id="paperModal" class="modal-backdrop" onclick="if(event.target===this) closePaperModal()">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 id="paperModalTitle" class="text-base font-bold text-slate-900">📝 新增套卷</h3>
+        <button onclick="closePaperModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <input type="hidden" id="paper-id" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">科目 *</label>
+            <select id="paper-mod" onchange="onPaperModChange()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+              <option value="408">408 专业课</option>
+              <option value="math">考研数学</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">套卷名称 *</label>
+            <input type="text" id="paper-name" placeholder="例如：李六 第3套 / 2024 真题"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">分类（真题 / 模拟卷）</label>
+            <select id="paper-category"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none">
+              <option value="">未选择</option>
+              <option value="真题">真题</option>
+              <option value="模拟卷">模拟卷</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">做题日期</label>
+            <input type="date" id="paper-date"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">小题分数</label>
+            <input type="number" min="0" step="0.5" id="paper-small" placeholder="如 40"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">大题分数</label>
+            <input type="number" min="0" step="0.5" id="paper-big" placeholder="如 55"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">用时（分钟）</label>
+            <input type="number" min="0" id="paper-time" placeholder="如 180"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">总结 / 反思</label>
+          <textarea id="paper-note" rows="2" placeholder="整体发挥、时间分配、下次注意..."
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-xs font-semibold text-slate-500">错误题（题号 + 错误点，可一键加入遗忘点）</label>
+            <button onclick="addPaperErrorRow()" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">＋ 添加错误题</button>
+          </div>
+          <div id="paper-errors-container" class="space-y-2"></div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
+        <button onclick="closePaperModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button onclick="savePaperModal()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">保存套卷</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 3: 历史快照管理 ==================== -->
+  <div id="snapshotModal" class="modal-backdrop" onclick="if(event.target===this) closeSnapshotModal()">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">🕒 历史快照（IndexedDB 自动滚动备份）</h3>
+          <p class="text-xs text-slate-500 mt-0.5">每次手动保存、导入 JSON 或删除记录前自动留存，最多保留最近 15 个快照，防误删丢数据</p>
+        </div>
+        <button onclick="closeSnapshotModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div id="snapshotListContainer" class="p-5 max-h-[65vh] overflow-y-auto space-y-3 bg-slate-50/40"></div>
+      <div class="px-6 py-3.5 border-t border-slate-100 bg-white flex items-center justify-between">
+        <span class="text-xs text-slate-400">数据保存在浏览器本地 IndexedDB (KaoyanTrackerDB)</span>
+        <button onclick="closeSnapshotModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 4: 自定义确认弹窗（替代 confirm） ==================== -->
+  <div id="confirmModal" class="modal-backdrop" onclick="if(event.target===this) closeConfirmModal(false)">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-sm shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="p-6">
+        <div class="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-xl mb-3" id="confirmIcon">⚠️</div>
+        <h3 id="confirmTitle" class="text-base font-bold text-slate-900 mb-1.5">确认操作</h3>
+        <p id="confirmMessage" class="text-sm text-slate-600 leading-relaxed"></p>
+      </div>
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2.5">
+        <button onclick="closeConfirmModal(false)" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button id="confirmOkBtn" onclick="closeConfirmModal(true)" class="btn-tactile px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 shadow-sm">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 4.5: 卡片放大查看（FLIP 平滑动画） ==================== -->
+  <div id="viewerModal" class="modal-backdrop" onclick="if(event.target===this) closeRecordViewer()">
+    <div id="viewerPanel" class="viewer-panel bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 class="text-base font-bold text-slate-900">🔍 卡片放大查看</h3>
+        <button onclick="closeRecordViewer()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div id="viewerBody" class="p-6 space-y-4 max-h-[72vh] overflow-y-auto"></div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
+        <button onclick="closeRecordViewer()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">关闭</button>
+        <button id="viewerEditBtn" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">✏️ 编辑此记录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 容器 -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-2.5 pointer-events-none"></div>
+
+  <script>
+    // =========================================================================
+    // 1. 常量配置与默认数据（100% 兼容 v3 JSON 数据结构）
+    // =========================================================================
+    const DB_NAME = 'KaoyanTrackerDB';
+    const DB_VERSION = 1;
+    const LS_KEY_V4 = 'kaoyan_tracker_data_v4';
+    const LS_KEY_V3 = 'kaoyan_tracker_data_v3';
+    const LS_PREFS_KEY = 'kaoyan_tracker_prefs_v4';
+    const MAX_SNAPSHOTS = 15;
+
+    const DEFAULT_DATA = {
+      "app": "考研数学与408薄弱点遗忘追踪表",
+      "version": 4,
+      "updatedAt": "2026-11-21T05:46:52.417Z",
+      "math": {
+        "subjects": ["高等数学", "线性代数", "概率论与数理统计"],
+        "records": [
+          {
+            "id": "math-1795240012408-t4hv",
+            "subject": "高等数学",
+            "topic": "27|李六|物理应用",
+            "type": "知识缺失",
+            "source": "模拟卷",
+            "status": "待解决",
+            "note": "忘记要用单位密度去求质量，然后算力，需要对物理应用进行弥补",
+            "forgetCount": 1,
+            "firstDateStr": "2026/11/21",
+            "dateStr": "2026/11/21",
+            "createdAt": 1795233600000
+          }
+        ]
+      },
+      "408": {
+        "subjects": ["数据结构", "计组", "操作系统", "网络"],
+        "records": [
+          {
+            "id": "408-1795239427422-l79u",
+            "subject": "数据结构",
+            "topic": "Cache 的写回策略",
+            "type": "理解错误",
+            "source": "模拟题",
+            "status": "待解决",
+            "note": "",
+            "forgetCount": 1,
+            "firstDateStr": "2026/11/21",
+            "dateStr": "2026/11/21",
+            "createdAt": 1795233600000
+          }
+        ]
+      },
+      "todos": [],
+      "papers": []
+    };
+
+    // 全局运行状态
+    let appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    let dbInstance = null;
+    let fileHandle = null;
+    let pendingSavedHandle = null; // 刷新后从 IndexedDB 恢复的句柄（等待用户点击授权）
+    let isDirty = false; // 是否有尚未手动保存/写盘的修改
+    let todoDateSortOrder = 'desc';
+    let viewModes = { math: 'card', '408': 'card' }; // 默认大卡片视图
+    let pageState = { math: { page: 1, size: 20 }, '408': { page: 1, size: 20 } }; // 分页状态
+    let paperDraftErrors = []; // 套卷弹窗中正在编辑的错误题草稿
+    let autoSyncEnabled = true;
+    let confirmResolver = null;
+
+    // =========================================================================
+    // 2. IndexedDB 封装（Tier 1: 主存储 + 文件句柄记忆 + 滚动历史快照）
+    // =========================================================================
+    function openDatabase() {
+      return new Promise((resolve) => {
+        if (!window.indexedDB) {
+          resolve(null);
+          return;
+        }
+        try {
+          const req = indexedDB.open(DB_NAME, DB_VERSION);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('state')) {
+              db.createObjectStore('state');
+            }
+            if (!db.objectStoreNames.contains('handles')) {
+              db.createObjectStore('handles');
+            }
+            if (!db.objectStoreNames.contains('snapshots')) {
+              db.createObjectStore('snapshots', { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = () => resolve(null);
+        } catch (err) {
+          console.warn('IndexedDB 不可用，将降级使用 localStorage', err);
+          resolve(null);
+        }
+      });
+    }
+
+    function idbGet(storeName, key) {
+      return new Promise((resolve) => {
+        if (!dbInstance) return resolve(null);
+        try {
+          const tx = dbInstance.transaction(storeName, 'readonly');
+          const req = tx.objectStore(storeName).get(key);
+          req.onsuccess = () => resolve(req.result ?? null);
+          req.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      });
+    }
+
+    function idbPut(storeName, value, key = undefined) {
+      return new Promise((resolve) => {
+        if (!dbInstance) return resolve(false);
+        try {
+          const tx = dbInstance.transaction(storeName, 'readwrite');
+          const store = tx.objectStore(storeName);
+          const req = key !== undefined ? store.put(value, key) : store.put(value);
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => resolve(false);
+        } catch {
+          resolve(false);
+        }
+      });
+    }
+
+    function idbGetAllSnapshots() {
+      return new Promise((resolve) => {
+        if (!dbInstance) return resolve([]);
+        try {
+          const tx = dbInstance.transaction('snapshots', 'readonly');
+          const req = tx.objectStore('snapshots').getAll();
+          req.onsuccess = () => {
+            const list = Array.isArray(req.result) ? req.result : [];
+            list.sort((a, b) => b.timestamp - a.timestamp);
+            resolve(list);
+          };
+          req.onerror = () => resolve([]);
+        } catch {
+          resolve([]);
+        }
+      });
+    }
+
+    async function createSnapshot(reason = '手动保存') {
+      if (!dbInstance) return;
+      const snap = {
+        id: `snap-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        timestamp: Date.now(),
+        reason,
+        mathCount: appData.math.records.length,
+        cs408Count: appData['408'].records.length,
+        todoCount: appData.todos.length,
+        data: JSON.parse(JSON.stringify(appData))
+      };
+      await idbPut('snapshots', snap);
+
+      // 保持最多 15 条滚动快照
+      const all = await idbGetAllSnapshots();
+      if (all.length > MAX_SNAPSHOTS) {
+        const toDelete = all.slice(MAX_SNAPSHOTS);
+        try {
+          const tx = dbInstance.transaction('snapshots', 'readwrite');
+          const store = tx.objectStore('snapshots');
+          toDelete.forEach(s => store.delete(s.id));
+        } catch (err) {
+          console.warn('清理旧快照失败', err);
+        }
+      }
+      await refreshSnapshotCount();
+    }
+
+    async function refreshSnapshotCount() {
+      const all = await idbGetAllSnapshots();
+      const badge = document.getElementById('snapshotCountBadge');
+      if (badge) badge.textContent = all.length;
+    }
+
+    // =========================================================================
+    // 3. 通用工具函数
+    // =========================================================================
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function isoToSlash(iso) {
+      if (!iso) return todayISO().replace(/-/g, '/');
+      return iso.replace(/-/g, '/');
+    }
+
+    function slashToIso(str) {
+      if (!str) return todayISO();
+      const parts = String(str).replace(/\//g, '-').split('-');
+      if (parts.length !== 3) return todayISO();
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+
+    function addDaysISO(iso, days) {
+      const [y, m, d] = iso.split('-').map(Number);
+      const dt = new Date(y, m - 1, d + days);
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    }
+
+    function getWeekday(iso) {
+      const [y, m, d] = iso.split('-').map(Number);
+      const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      return days[new Date(y, m - 1, d).getDay()];
+    }
+
+    function formatDateTime(ts) {
+      const d = new Date(ts);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function genId(prefix) {
+      return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ===================== Markdown 渲染（备注 / 反思专用） =====================
+    // 行内语法：输入已 escapeHtml，输出安全 HTML
+    function mdInline(s) {
+      return s
+        .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*\n])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+        .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, txt, href) => {
+          if (/^\s*(javascript|vbscript|data)\s*:/i.test(href)) return txt;
+          return `<a href="${href}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
+        });
+    }
+
+    // 块级解析：标题 / 列表 / 引用 / 代码块 / 表格 / 分隔线 / 段落（单换行 → <br>）
+    function mdRender(src) {
+      const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+      const out = [];
+      const listStack = [];
+      const liOpenStack = []; // 与 listStack 平行：每层列表是否有未闭合 <li>
+      const closeLists = (to = 0) => {
+        while (liOpenStack.length > to) {
+          if (liOpenStack.pop()) out.push('</li>');
+          out.push(listStack.pop() === 'ol' ? '</ol>' : '</ul>');
+        }
+      };
+      const splitRow = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // 围栏代码块 ```
+        if (/^\s*```/.test(line)) {
+          closeLists();
+          const buf = [];
+          i++;
+          while (i < lines.length && !/^\s*```/.test(lines[i])) { buf.push(lines[i]); i++; }
+          i++;
+          out.push(`<pre class="md-pre"><code>${buf.join('\n')}</code></pre>`);
+          continue;
+        }
+        // 空行
+        if (!line.trim()) { closeLists(); i++; continue; }
+        // 标题
+        const h = line.match(/^(#{1,6})\s+(.+)$/);
+        if (h) {
+          closeLists();
+          const lv = h[1].length;
+          out.push(`<h${lv} class="md-h md-h${lv}">${mdInline(h[2])}</h${lv}>`);
+          i++; continue;
+        }
+        // 分隔线 --- / *** / ___
+        if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) { closeLists(); out.push('<hr class="md-hr">'); i++; continue; }
+        // 引用 >
+        if (/^\s*&gt;/.test(line)) {
+          closeLists();
+          const buf = [];
+          while (i < lines.length && /^\s*&gt;\s?/.test(lines[i])) {
+            buf.push(lines[i].replace(/^\s*&gt;\s?/, ''));
+            i++;
+          }
+          out.push(`<blockquote class="md-quote"><p class="md-p">${buf.map(mdInline).join('<br>')}</p></blockquote>`);
+          continue;
+        }
+        // 表格（当前行含 |，下一行为 |:---:| 形式分隔行）
+        if (line.includes('|') && i + 1 < lines.length && /-\s*\|/.test(lines[i + 1]) && /^\s*\|?[\s:|-]+$/.test(lines[i + 1])) {
+          closeLists();
+          const header = splitRow(line);
+          const aligns = splitRow(lines[i + 1]).map(c =>
+            c.startsWith(':') && c.endsWith(':') ? 'center' : (c.endsWith(':') ? 'right' : ''));
+          i += 2;
+          const rows = [];
+          while (i < lines.length && lines[i].trim() && lines[i].includes('|')) { rows.push(splitRow(lines[i])); i++; }
+          const alignAttr = (idx) => aligns[idx] ? ` style="text-align:${aligns[idx]}"` : '';
+          out.push(
+            `<table class="md-table"><thead><tr>${header.map((c, idx) => `<th${alignAttr(idx)}>${mdInline(c)}</th>`).join('')}</tr></thead><tbody>${
+              rows.map(r => `<tr>${header.map((_, idx) => `<td${alignAttr(idx)}>${mdInline(r[idx] || '')}</td>`).join('')}</tr>`).join('')
+            }</tbody></table>`);
+          continue;
+        }
+        // 列表项（2 空格 = 一层嵌套，嵌套列表包在父级 <li> 内）
+        const li = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.+)$/);
+        if (li) {
+          const level = Math.floor(li[1].replace(/\t/g, '  ').length / 2);
+          const want = /\d/.test(li[2][0]) ? 'ol' : 'ul';
+          if (listStack.length > level + 1) closeLists(level + 1);
+          if (listStack.length === level + 1 && listStack[listStack.length - 1] !== want) closeLists(level);
+          while (listStack.length < level + 1) {
+            const t = listStack.length === level ? want : 'ul';
+            out.push(`<${t} class="md-list">`);
+            listStack.push(t);
+            liOpenStack.push(false);
+          }
+          if (liOpenStack[liOpenStack.length - 1]) out.push('</li>'); // 同级新条目：闭合上一条
+          out.push(`<li>${mdInline(li[3])}`);
+          liOpenStack[liOpenStack.length - 1] = true;
+          i++; continue;
+        }
+        // 段落：连续非空行合并，单换行转 <br>（兼容旧纯文本备注的换行习惯）
+        closeLists();
+        const buf = [line];
+        i++;
+        while (i < lines.length && lines[i].trim() &&
+          !/^\s*(#{1,6}\s|```|&gt;|([-*+]|\d+[.)])\s)/.test(lines[i]) &&
+          !/^\s*([-*_])\s*(\1\s*){2,}$/.test(lines[i])) {
+          buf.push(lines[i]); i++;
+        }
+        out.push(`<p class="md-p">${buf.map(mdInline).join('<br>')}</p>`);
+      }
+      closeLists();
+      return out.join('');
+    }
+
+    // 公共入口：先保护数学公式 → 整体转义 HTML → 渲染 Markdown → 还原公式
+    const mathStore = [];
+    function renderMarkdown(text) {
+      mathStore.length = 0;
+      // 提取公式：$$...$$（独立公式，可跨行）与 $...$（行内公式，不跨行），
+      // 用占位符顶替，避免 TeX 里的 * _ | 等符号被 Markdown 语法误伤
+      const masked = String(text || '')
+        .replace(/\$\$([\s\S]+?)\$\$/g, m => { mathStore.push({ tex: m, display: true }); return `⟦M${mathStore.length - 1}⟧`; })
+        .replace(/\$([^\$\n]+?)\$/g, m => { mathStore.push({ tex: m, display: false }); return `⟦M${mathStore.length - 1}⟧`; });
+      const escaped = escapeHtml(masked).trim();
+      if (!escaped) return '';
+      const html = mdRender(escaped);
+      // 还原公式原文（含 $ 分隔符），交给 KaTeX auto-render 扫描渲染
+      return html.replace(/⟦M(\d+)⟧/g, (m, idx) => {
+        const item = mathStore[+idx];
+        if (!item) return '';
+        const esc = escapeHtml(item.tex);
+        return item.display ? `<span class="md-math-display">${esc}</span>` : esc;
+      });
+    }
+
+    // KaTeX 扫描选项
+    const KATEX_OPTS = {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false }
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    };
+
+    // 对单个已注入 DOM 的 Markdown 容器渲染公式
+    function renderMathIn(el) {
+      if (el && window.renderMathInElement) {
+        try { window.renderMathInElement(el, KATEX_OPTS); } catch (e) { /* 降级：保留原文 */ }
+      }
+    }
+
+    // KaTeX 加载完成后全量补渲染（处理脚本先于 KaTeX 就绪渲染的内容）
+    window.renderMathAll = function () {
+      if (!window.renderMathInElement) return;
+      document.querySelectorAll('.md-body').forEach(el => renderMathIn(el));
+    };
+
+    // ---------- 备注编辑器辅助（工具栏 / Tab / 快捷键 / 实时预览） ----------
+    function recNoteSwitchTab(mode) {
+      const ta = document.getElementById('rec-note');
+      const pv = document.getElementById('rec-note-preview');
+      const toolbar = document.getElementById('rec-note-toolbar');
+      const flex = document.getElementById('rec-note-flex');
+      const panel = document.getElementById('recordModalPanel');
+      const m = ['edit', 'split', 'preview'].includes(mode) ? mode : 'edit';
+      const showTa = m !== 'preview';
+      const showPv = m !== 'edit';
+      ta.classList.toggle('hidden', !showTa);
+      toolbar.classList.toggle('hidden', m === 'preview');
+      pv.classList.toggle('hidden', !showPv);
+      flex.classList.toggle('md-split', m === 'split');
+      panel.classList.toggle('md-wide', m === 'split'); // 分屏时平滑加宽弹窗
+      ['edit', 'split', 'preview'].forEach(k =>
+        document.getElementById('rec-note-tab-' + k).classList.toggle('md-tab-active', k === m));
+      if (showPv) recNoteRefreshPreview();
+    }
+
+    // 输入防抖后实时刷新预览
+    let recPreviewTimer = null;
+    function recNoteLivePreview() {
+      clearTimeout(recPreviewTimer);
+      recPreviewTimer = setTimeout(recNoteRefreshPreview, 90);
+    }
+
+    function recNoteRefreshPreview() {
+      const pv = document.getElementById('rec-note-preview');
+      if (pv.classList.contains('hidden')) return;
+      pv.innerHTML = renderMarkdown(document.getElementById('rec-note').value) ||
+        '<p class="md-p text-slate-400 italic">（暂无内容，切回「编辑」写下你的思考…）</p>';
+      renderMathIn(pv);
+    }
+
+    // ---------- 卡片放大查看（FLIP：从卡片位置平滑放大到弹窗） ----------
+    let viewerCtx = null; // { mod, id, backdrop, panel, closing }
+
+    // 卡片点击：跳过内部的按钮 / 下拉 / 链接等交互元素
+    function cardClick(e, mod, id) {
+      if (e.target.closest('button, select, a, input, textarea, label, option')) return;
+      openRecordViewer(mod, id, e.currentTarget);
+    }
+
+    function buildViewerHtml(mod, rec) {
+      const fc = Number(rec.forgetCount) || 1;
+      const isHigh = fc >= 3;
+      const fcColor = fc >= 3 ? 'text-rose-600' : (fc === 2 ? 'text-amber-600' : 'text-blue-600');
+      const statusIcon = { '待解决': '🔴', '复习中': '🟡', '已掌握': '🟢' }[rec.status] || '';
+      const statusStyle = rec.status === '已掌握'
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : (rec.status === '复习中' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200');
+      const subjectBadge = mod === 'math'
+        ? 'bg-blue-50 text-blue-700 border-blue-100'
+        : 'bg-violet-50 text-violet-700 border-violet-100';
+      return `
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-2.5 py-1 rounded-lg text-xs font-semibold border ${subjectBadge}">${escapeHtml(rec.subject)}</span>
+          <span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">${escapeHtml(rec.type || '未分类')}</span>
+          ${rec.source ? `<span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50/70 text-indigo-600">📌 ${escapeHtml(rec.source)}</span>` : ''}
+          <span class="ml-auto px-3 py-1 rounded-full text-xs font-semibold border ${statusStyle}">${statusIcon} ${escapeHtml(rec.status || '待解决')}</span>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 leading-snug tracking-tight break-words">${escapeHtml(rec.topic)}</h2>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 bg-gradient-to-r from-slate-50 to-blue-50/40 border border-slate-200/70 rounded-xl px-4 py-3">
+          <div class="flex items-baseline gap-2.5">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">累计遗忘</span>
+            <span class="text-2xl font-extrabold ${fcColor} tabular-nums">${fc}</span>
+            <span class="text-xs text-slate-400">次</span>
+            ${isHigh ? `<span class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">高频易忘</span>` : ''}
+          </div>
+          <div class="ml-auto text-xs text-slate-500">
+            最近：<b class="text-slate-700 font-semibold">${escapeHtml(rec.dateStr || '-')}</b>
+            <span class="text-slate-300 mx-1">|</span>首次：${escapeHtml(rec.firstDateStr || rec.dateStr || '-')}
+          </div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-500 mb-2">备注 / 反思（Markdown 渲染）</div>
+          <div class="md-body text-sm text-slate-700 bg-slate-50/90 border border-slate-200/70 rounded-xl px-4 py-3.5 min-h-[6rem]">
+            ${rec.note ? renderMarkdown(rec.note) : '<p class="md-p text-slate-400 italic">（暂无备注，点击下方「编辑此记录」补充...）</p>'}
+          </div>
+        </div>
+        ${forgetTrailHtml(rec)}
+      `;
+    }
+
+    function openRecordViewer(mod, id, cardEl) {
+      if (viewerCtx) return;
+      const rec = appData[mod].records.find(r => r.id === id);
+      if (!rec) return;
+      const backdrop = document.getElementById('viewerModal');
+      const panel = document.getElementById('viewerPanel');
+      document.getElementById('viewerBody').innerHTML = buildViewerHtml(mod, rec);
+      renderMathIn(document.getElementById('viewerBody'));
+      document.getElementById('viewerEditBtn').onclick = () => {
+        closeRecordViewer(true);
+        openRecordModal(mod, id);
+      };
+      viewerCtx = { mod, id, backdrop, panel, closing: false };
+
+      // 背景淡入（display:none → flex 需手动触发过渡）
+      backdrop.style.transition = 'none';
+      backdrop.style.opacity = '0';
+      backdrop.classList.add('open');
+      backdrop.getBoundingClientRect(); // 强制回流
+      backdrop.style.transition = '';
+
+      // FLIP：先摆到卡片位置，再过渡回原位
+      const target = panel.getBoundingClientRect();
+      panel.style.transformOrigin = 'top left';
+      if (cardEl) {
+        const cr = cardEl.getBoundingClientRect();
+        const sx = Math.max(cr.width, 80) / Math.max(target.width, 1);
+        panel.style.transform = `translate(${cr.left - target.left}px, ${cr.top - target.top}px) scale(${sx})`;
+      } else {
+        panel.style.transformOrigin = 'center center';
+        panel.style.transform = 'scale(0.92)';
+      }
+      panel.style.opacity = '0';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        backdrop.style.opacity = '';
+        panel.style.transition = 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease';
+        panel.style.transform = 'translate(0, 0) scale(1)';
+        panel.style.opacity = '1';
+      }));
+    }
+
+    function closeRecordViewer(skipAnim = false) {
+      if (!viewerCtx || viewerCtx.closing) return;
+      const { mod, id, backdrop, panel } = viewerCtx;
+      viewerCtx.closing = true;
+      const cardEl = document.querySelector(`article[data-rid="${id}"]`);
+      const cr = cardEl ? cardEl.getBoundingClientRect() : null;
+      if (skipAnim || !cr || !cr.width) {
+        backdrop.classList.remove('open');
+        panel.style.cssText = '';
+        viewerCtx = null;
+        return;
+      }
+      const target = panel.getBoundingClientRect();
+      const sx = Math.max(cr.width, 80) / Math.max(target.width, 1);
+      panel.style.transformOrigin = 'top left';
+      panel.style.transition = 'transform 0.34s cubic-bezier(0.55, 0, 0.55, 0.2), opacity 0.28s ease';
+      panel.style.transform = `translate(${cr.left - target.left}px, ${cr.top - target.top}px) scale(${sx})`;
+      panel.style.opacity = '0';
+      backdrop.style.opacity = '0';
+      setTimeout(() => {
+        backdrop.classList.remove('open');
+        panel.style.cssText = '';
+        backdrop.style.opacity = '';
+        viewerCtx = null;
+      }, 360);
+    }
+
+    // ESC 关闭放大查看
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && viewerCtx && !viewerCtx.closing) closeRecordViewer();
+    });
+
+    // 用 before/after 包裹选区（无选区时插入 placeholder）
+    function recNoteWrapSel(before, after, placeholder) {
+      const ta = document.getElementById('rec-note');
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const sel = ta.value.slice(s, e) || placeholder || '';
+      ta.value = ta.value.slice(0, s) + before + sel + after + ta.value.slice(e);
+      ta.focus();
+      ta.selectionStart = s + before.length;
+      ta.selectionEnd = s + before.length + sel.length;
+    }
+
+    // 在光标处插入文本
+    function recNoteInsert(text) {
+      const ta = document.getElementById('rec-note');
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = s + text.length;
+    }
+
+    // 给选区内每行加前缀（标题 / 列表 / 引用）；autoNum=true 时生成 1. 2. 3.
+    function recNotePrefixLines(prefix, autoNum) {
+      const ta = document.getElementById('rec-note');
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const v = ta.value;
+      const ls = v.lastIndexOf('\n', s - 1) + 1;
+      let le = v.indexOf('\n', e);
+      if (le === -1) le = v.length;
+      const lines = v.slice(ls, le).split('\n');
+      const patched = lines.map((ln, idx) => {
+        const p = autoNum ? `${idx + 1}. ` : prefix;
+        const stripped = autoNum ? ln.replace(/^\s*\d+[.)]\s+/, '') : ln;
+        return stripped.startsWith(p) ? stripped : p + stripped;
+      });
+      const block = patched.join('\n');
+      ta.value = v.slice(0, ls) + block + v.slice(le);
+      ta.focus();
+      ta.selectionStart = ls;
+      ta.selectionEnd = ls + block.length;
+    }
+
+    // 备注编辑区快捷键：Ctrl+B 加粗 / Ctrl+I 斜体 / Tab 缩进
+    function recNoteKeydown(e) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        recNoteWrapSel('**', '**', '加粗文字');
+      } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        recNoteWrapSel('*', '*', '斜体文字');
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        recNoteInsert('  ');
+      }
+    }
+
+    // 动画 Toast 提示
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const icons = { success: '✅', warning: '⚠️', error: '❌', info: '✨' };
+      const styles = {
+        success: 'bg-emerald-900/95 text-emerald-50 border-emerald-700/60',
+        warning: 'bg-amber-900/95 text-amber-50 border-amber-700/60',
+        error: 'bg-rose-900/95 text-rose-50 border-rose-700/60',
+        info: 'bg-slate-900/95 text-white border-slate-700/60'
+      };
+      const el = document.createElement('div');
+      el.className = `toast-item pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border shadow-xl backdrop-blur ${styles[type] || styles.info}`;
+      el.innerHTML = `<span class="text-base">${icons[type] || icons.info}</span><span>${escapeHtml(msg)}</span>`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('hiding');
+        setTimeout(() => el.remove(), 260);
+      }, 2500);
+    }
+
+    // 自定义确认弹窗（替代浏览器原生 confirm）
+    function showConfirm({ title = '确认操作', message = '', okText = '确认', danger = true }) {
+      return new Promise((resolve) => {
+        confirmResolver = resolve;
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+        const okBtn = document.getElementById('confirmOkBtn');
+        okBtn.textContent = okText;
+        okBtn.className = danger
+          ? 'btn-tactile px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 shadow-sm'
+          : 'btn-tactile px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm';
+        document.getElementById('confirmIcon').textContent = danger ? '🗑️' : '🔄';
+        document.getElementById('confirmModal').classList.add('open');
+      });
+    }
+
+    function closeConfirmModal(result) {
+      document.getElementById('confirmModal').classList.remove('open');
+      if (confirmResolver) {
+        const fn = confirmResolver;
+        confirmResolver = null;
+        fn(result);
+      }
+    }
+
+    // =========================================================================
+    // 3.5 分页辅助 & 遗忘事件时间戳
+    // =========================================================================
+    function onRecordFilterChange(mod) {
+      pageState[mod].page = 1;
+      renderRecords(mod);
+    }
+
+    function gotoPage(mod, p) {
+      pageState[mod].page = Math.max(1, p);
+      renderRecords(mod);
+    }
+
+    function changePageSize(mod, size) {
+      pageState[mod].size = parseInt(size, 10) || 20;
+      pageState[mod].page = 1;
+      savePrefs();
+      renderRecords(mod);
+    }
+
+    function renderPaginationBar(mod, total, totalPages, el) {
+      if (totalPages <= 1) { el.innerHTML = ''; return; }
+      const ps = pageState[mod];
+      const sizeOpts = [20, 50, 100].map(s => `<option value="${s}" ${ps.size === s ? 'selected' : ''}>${s}</option>`).join('');
+      el.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm px-4 py-3">
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <span>每页</span>
+            <select onchange="changePageSize('${mod}', this.value)" class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/70 text-sm focus:border-blue-500 outline-none">${sizeOpts}</select>
+            <span>条 · 共 <b class="text-slate-800">${total}</b> 条</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="gotoPage('${mod}', ${ps.page - 1})" ${ps.page <= 1 ? 'disabled' : ''} class="btn-tactile px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">← 上一页</button>
+            <span class="text-sm font-semibold text-slate-700 tabular-nums">第 ${ps.page} / ${totalPages} 页</span>
+            <button onclick="gotoPage('${mod}', ${ps.page + 1})" ${ps.page >= totalPages ? 'disabled' : ''} class="btn-tactile px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页 →</button>
+          </div>
+        </div>`;
+    }
+
+    // "2026/11/21" -> 当天正午的毫秒时间戳（避免时区/夏令时边界问题）
+    function dateStrToTs(str) {
+      const [y, m, d] = slashToIso(str).split('-').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0).getTime();
+    }
+
+    // 兼容旧数据：为缺少 forgetEvents 的记录补种首/末两次已知日期（不伪造中间时间）
+    function migrateRecord(r) {
+      const rec = { ...r };
+      if (!Array.isArray(rec.forgetEvents)) {
+        const events = [];
+        const firstTs = dateStrToTs(rec.firstDateStr || rec.dateStr);
+        events.push(firstTs);
+        const lastTs = dateStrToTs(rec.dateStr || rec.firstDateStr);
+        if ((Number(rec.forgetCount) || 1) > 1 && lastTs !== firstTs) events.push(lastTs);
+        rec.forgetEvents = events;
+      }
+      return rec;
+    }
+
+    // 套卷数据规范化：兼容缺字段 / 旧数据，分数空值统一为 null
+    function migratePaper(p) {
+      const numOrNull = v => (v === '' || v === null || v === undefined || isNaN(Number(v))) ? null : Number(v);
+      const paper = { ...p };
+      paper.id = paper.id || genId('paper');
+      paper.mod = paper.mod === 'math' ? 'math' : '408';
+      paper.name = paper.name || '';
+      const rawCat = (paper.category || '').trim();
+      paper.category = rawCat.includes('真题') ? '真题' : (rawCat ? '模拟卷' : '');
+      paper.smallScore = numOrNull(paper.smallScore);
+      paper.bigScore = numOrNull(paper.bigScore);
+      paper.timeUsed = numOrNull(paper.timeUsed);
+      paper.dateStr = isoToSlash(slashToIso(paper.dateStr || todayISO()));
+      paper.note = paper.note || '';
+      paper.errors = (Array.isArray(paper.errors) ? paper.errors : []).map(e => ({
+        id: e.id || genId('err'),
+        qno: e.qno || '',
+        point: e.point || '',
+        sub: e.sub || '',
+        addedToTracker: Boolean(e.addedToTracker)
+      }));
+      paper.createdAt = paper.createdAt || Date.now();
+      return paper;
+    }
+
+    // 卡片上的紧凑遗忘轨迹（最近至多 5 次 + 间隔天数）
+    function forgetTrailHtml(rec) {
+      const ev = Array.isArray(rec.forgetEvents) ? rec.forgetEvents.slice().sort((a, b) => a - b) : [];
+      if (!ev.length) return '';
+      const count = Number(rec.forgetCount) || 1;
+      const fmt = ts => { const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}`; };
+      const shown = ev.length > 5 ? ev.slice(-5) : ev;
+      const prefix = ev.length > 5 ? `<span class="text-slate-400 mr-1">…前${ev.length - 5}次</span>` : '';
+      const parts = [];
+      shown.forEach((ts, i) => {
+        if (i > 0) {
+          const gap = Math.round((ts - shown[i - 1]) / 86400000);
+          parts.push(`<span class="text-slate-300 mx-1">→</span><span class="text-[10px] text-slate-400">${gap}天</span><span class="text-slate-300 mx-1">→</span>`);
+        }
+        parts.push(`<span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">${fmt(ts)}</span>`);
+      });
+      const untracked = count - ev.length;
+      const note = untracked > 0 ? `<span class="text-[10px] text-slate-400 ml-1.5">另${untracked}次早期未记时</span>` : '';
+      return `<div class="flex flex-wrap items-center gap-y-1 text-[11px] mt-2.5"><span class="text-slate-400 font-semibold mr-1.5">遗忘轨迹</span>${prefix}${parts.join('')}${note}</div>`;
+    }
+
+    // 编辑弹窗里的完整遗忘历史
+    function forgetHistoryHtml(rec) {
+      const ev = Array.isArray(rec.forgetEvents) ? rec.forgetEvents.slice().sort((a, b) => a - b) : [];
+      const count = Number(rec.forgetCount) || 1;
+      if (!ev.length) return '<div class="text-slate-400 italic">暂无精确时间记录</div>';
+      const p = n => String(n).padStart(2, '0');
+      const fmt = ts => { const d = new Date(ts); return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+      let html = ev.map((ts, i) => {
+        const gap = i > 0 ? ` <span class="text-slate-400">（距上次 ${Math.round((ts - ev[i - 1]) / 86400000)} 天）</span>` : ' <span class="text-slate-400">（首次）</span>';
+        return `<div>第 ${i + 1} 次 · ${fmt(ts)}${gap}</div>`;
+      }).join('');
+      if (count > ev.length) html += `<div class="text-slate-400 italic mt-1">另有 ${count - ev.length} 次早期遗忘未记录精确时间</div>`;
+      return html;
+    }
+
+    // =========================================================================
+    // 4. 数据规范化、三层存储同步与手动保存
+    // =========================================================================
+    function normalizeData(raw) {
+      const base = JSON.parse(JSON.stringify(DEFAULT_DATA));
+      if (!raw || typeof raw !== 'object') return base;
+
+      base.app = raw.app || base.app;
+      base.version = 4;
+      base.updatedAt = raw.updatedAt || new Date().toISOString();
+
+      if (raw.math) {
+        base.math.subjects = Array.isArray(raw.math.subjects) && raw.math.subjects.length
+          ? raw.math.subjects : base.math.subjects;
+        base.math.records = (Array.isArray(raw.math.records) ? raw.math.records : []).map(migrateRecord);
+      }
+      if (raw['408']) {
+        base['408'].subjects = Array.isArray(raw['408'].subjects) && raw['408'].subjects.length
+          ? raw['408'].subjects : base['408'].subjects;
+        base['408'].records = (Array.isArray(raw['408'].records) ? raw['408'].records : []).map(migrateRecord);
+      }
+      base.todos = Array.isArray(raw.todos) ? raw.todos.map(t => ({
+        id: t.id || genId('todo'),
+        dateStr: slashToIso(t.dateStr || todayISO()),
+        title: t.title || '',
+        category: t.category || '综合',
+        priority: t.priority || '中',
+        completed: Boolean(t.completed),
+        note: t.note || '',
+        createdAt: t.createdAt || Date.now()
+      })) : [];
+
+      base.papers = Array.isArray(raw.papers) ? raw.papers.map(migratePaper) : [];
+
+      // 修正旧数据：从套卷加入遗忘点时误把套卷名称（如“2015”）当来源标签，改回套卷分类（真题/模拟卷）
+      base.papers.forEach(pp => {
+        if (!pp.name || pp.name === pp.category) return;
+        ['math', '408'].forEach(m => {
+          base[m].records.forEach(r => {
+            if (r.source === pp.name) r.source = pp.category || '';
+          });
+        });
+      });
+
+      return base;
+    }
+
+    function loadPrefs() {
+      try {
+        const raw = localStorage.getItem(LS_PREFS_KEY);
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p.viewModes) viewModes = { ...viewModes, ...p.viewModes };
+          if (typeof p.autoSyncEnabled === 'boolean') autoSyncEnabled = p.autoSyncEnabled;
+          if (p.pageSizes) {
+            if (p.pageSizes.math) pageState.math.size = p.pageSizes.math;
+            if (p.pageSizes['408']) pageState['408'].size = p.pageSizes['408'];
+          }
+        }
+      } catch {}
+      document.getElementById('autoSyncToggle').checked = autoSyncEnabled;
+    }
+
+    function savePrefs() {
+      try {
+        localStorage.setItem(LS_PREFS_KEY, JSON.stringify({ viewModes, autoSyncEnabled, pageSizes: { math: pageState.math.size, '408': pageState['408'].size } }));
+      } catch {}
+    }
+
+    function setDirtyState(dirty) {
+      isDirty = dirty;
+      const dot = document.getElementById('dirtyDot');
+      const saveText = document.getElementById('manualSaveText');
+      if (dirty) {
+        dot.classList.remove('hidden');
+        saveText.textContent = '保存修改';
+      } else {
+        dot.classList.add('hidden');
+        saveText.textContent = '手动保存';
+      }
+    }
+
+    function updateSyncUI() {
+      const badge = document.getElementById('syncBadge');
+      const dot = document.getElementById('syncDot');
+      const text = document.getElementById('syncText');
+      const reconnectBtn = document.getElementById('reconnectBtn');
+      const autoSyncWrap = document.getElementById('autoSyncWrap');
+
+      if (fileHandle) {
+        badge.className = 'inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 transition-all';
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        text.textContent = `已绑定：${fileHandle.name}`;
+        reconnectBtn.classList.add('hidden');
+        autoSyncWrap.classList.remove('hidden');
+      } else if (pendingSavedHandle) {
+        badge.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 transition-all';
+        dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+        text.textContent = `待恢复：${pendingSavedHandle.name}`;
+        reconnectBtn.classList.remove('hidden');
+        autoSyncWrap.classList.add('hidden');
+      } else {
+        badge.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 transition-all';
+        dot.className = 'w-2 h-2 rounded-full bg-blue-500';
+        text.textContent = dbInstance ? 'IndexedDB 本地库' : '浏览器缓存';
+        reconnectBtn.classList.add('hidden');
+        autoSyncWrap.classList.add('hidden');
+      }
+    }
+
+    async function writeToBoundFile() {
+      if (!fileHandle) return false;
+      try {
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(appData, null, 2));
+        await writable.close();
+        return true;
+      } catch (err) {
+        console.error('写入本地 JSON 失败', err);
+        return false;
+      }
+    }
+
+    // 常规修改后的持久化（写入 IndexedDB + localStorage，若开启自动写盘则同步本地文件）
+    async function persistData(silent = false) {
+      appData.updatedAt = new Date().toISOString();
+      appData.version = 4;
+
+      // Tier 1: IndexedDB + localStorage 镜像兜底
+      await idbPut('state', appData, 'current');
+      try {
+        localStorage.setItem(LS_KEY_V4, JSON.stringify(appData));
+      } catch {}
+
+      updateTabCounts();
+
+      // Tier 2: 若已绑定本地 JSON 且开启自动写盘
+      if (fileHandle && autoSyncEnabled) {
+        const ok = await writeToBoundFile();
+        if (ok) {
+          setDirtyState(false);
+          if (!silent) showToast('已自动同步至本地 JSON 与 IndexedDB', 'success');
+        } else {
+          setDirtyState(true);
+          showToast('写入本地文件失败，已暂存至 IndexedDB，请点击手动保存重试', 'warning');
+        }
+      } else {
+        // 未绑定文件或关闭了自动写盘 -> 标记“有未保存修改”，提醒用户可点手动保存留存快照/写盘
+        setDirtyState(true);
+      }
+    }
+
+    // Tier 3: 手动保存按钮 & Ctrl+S / Cmd+S
+    async function manualSave() {
+      appData.updatedAt = new Date().toISOString();
+      appData.version = 4;
+
+      // 1. 写入 IndexedDB 主库 + localStorage
+      await idbPut('state', appData, 'current');
+      try {
+        localStorage.setItem(LS_KEY_V4, JSON.stringify(appData));
+      } catch {}
+
+      // 2. 创建时间戳历史快照
+      await createSnapshot('手动保存');
+
+      // 3. 若已绑定本地 JSON，强制写盘
+      let fileSynced = false;
+      if (fileHandle) {
+        fileSynced = await writeToBoundFile();
+      }
+
+      setDirtyState(false);
+
+      // 按钮庆祝动效
+      const btn = document.getElementById('manualSaveBtn');
+      const icon = document.getElementById('manualSaveIcon');
+      const text = document.getElementById('manualSaveText');
+      icon.textContent = '✅';
+      text.textContent = '已保存';
+      btn.classList.add('animate-pop');
+      setTimeout(() => {
+        icon.textContent = '💾';
+        text.textContent = isDirty ? '保存修改' : '手动保存';
+        btn.classList.remove('animate-pop');
+      }, 1200);
+
+      if (fileHandle && fileSynced) {
+        showToast(`保存成功！已写入 ${fileHandle.name} 并生成历史快照`, 'success');
+      } else if (fileHandle && !fileSynced) {
+        showToast('已保存至 IndexedDB 并生成快照，但本地文件写入权限失效，请重新绑定', 'warning');
+      } else {
+        showToast('已保存至 IndexedDB 并生成历史快照（绑定本地 JSON 可同步到硬盘）', 'success');
+      }
+    }
+
+    function toggleAutoSync(checked) {
+      autoSyncEnabled = checked;
+      savePrefs();
+      showToast(checked ? '已开启自动写盘：每次修改自动写入本地 JSON' : '已关闭自动写盘：请通过“手动保存”或 Ctrl+S 写盘', 'info');
+    }
+
+    // 绑定本地 JSON 文件（并记忆句柄到 IndexedDB）
+    async function bindLocalJson() {
+      if (!window.showOpenFilePicker) {
+        showToast('当前浏览器不支持直接绑定，请使用“导入 / 导出JSON”', 'warning');
+        return;
+      }
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'JSON 数据文件', accept: { 'application/json': ['.json'] } }]
+        });
+        const file = await handle.getFile();
+        const text = await file.text();
+        const parsed = normalizeData(JSON.parse(text));
+
+        await createSnapshot(`绑定文件前备份 (${file.name})`);
+        appData = parsed;
+        fileHandle = handle;
+        pendingSavedHandle = null;
+
+        await idbPut('handles', handle, 'jsonFile');
+        await idbPut('state', appData, 'current');
+        try { localStorage.setItem(LS_KEY_V4, JSON.stringify(appData)); } catch {}
+
+        setDirtyState(false);
+        updateSyncUI();
+        renderAll();
+        showToast(`成功绑定并加载 ${file.name}`, 'success');
+      } catch (err) {
+        if (err && err.name !== 'AbortError') {
+          showToast('打开文件失败：请检查是否为合法的 JSON 文件', 'error');
+        }
+      }
+    }
+
+    // 刷新后一键恢复之前绑定的文件句柄权限
+    async function reconnectLocalJson() {
+      if (!pendingSavedHandle) return;
+      try {
+        const perm = await pendingSavedHandle.requestPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          fileHandle = pendingSavedHandle;
+          pendingSavedHandle = null;
+          updateSyncUI();
+
+          // 读取本地文件并与当前数据同步（默认以最新时间戳或提示）
+          const file = await fileHandle.getFile();
+          const text = await file.text();
+          if (text.trim()) {
+            const diskData = normalizeData(JSON.parse(text));
+            const diskTime = new Date(diskData.updatedAt || 0).getTime();
+            const localTime = new Date(appData.updatedAt || 0).getTime();
+            if (diskTime > localTime) {
+              await createSnapshot('恢复同步前备份');
+              appData = diskData;
+              await idbPut('state', appData, 'current');
+              renderAll();
+              showToast(`已恢复同步并加载硬盘中较新的 ${fileHandle.name}`, 'success');
+            } else {
+              await writeToBoundFile();
+              showToast(`已恢复同步，并将最新数据写回 ${fileHandle.name}`, 'success');
+            }
+          }
+          setDirtyState(false);
+        } else {
+          showToast('未获得文件读写权限，已继续使用 IndexedDB', 'warning');
+        }
+      } catch (err) {
+        showToast('恢复文件同步失败，请重新点击“绑定本地JSON”', 'error');
+      }
+    }
+
+    function handleImportFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const parsed = normalizeData(JSON.parse(e.target.result));
+          await createSnapshot(`导入 ${file.name} 前备份`);
+          appData = parsed;
+          await persistData(true);
+          renderAll();
+          showToast(`成功导入 ${file.name}（已自动为旧数据创建快照）`, 'success');
+        } catch {
+          showToast('JSON 解析失败，请检查文件内容', 'error');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+      event.target.value = '';
+    }
+
+    function exportJson() {
+      appData.updatedAt = new Date().toISOString();
+      appData.version = 4;
+      const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileHandle ? fileHandle.name : `kaoyan_tracker_${todayISO()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('已导出 JSON 备份文件', 'success');
+    }
+
+    // =========================================================================
+    // 5. 历史快照弹窗逻辑
+    // =========================================================================
+    async function openSnapshotModal() {
+      const list = await idbGetAllSnapshots();
+      const container = document.getElementById('snapshotListContainer');
+      if (!list.length) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm">暂无历史快照，点击顶部“手动保存”即可创建第一个快照 ✨</div>`;
+      } else {
+        container.innerHTML = list.map((s, idx) => `
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 hover:border-blue-300 transition-all shadow-xs">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-bold text-slate-800">${formatDateTime(s.timestamp)}</span>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${idx === 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}">${escapeHtml(s.reason)}</span>
+              </div>
+              <div class="text-xs text-slate-500 mt-1.5 flex items-center gap-3">
+                <span>📐 数学: <b>${s.mathCount}</b></span>
+                <span>💻 408: <b>${s.cs408Count}</b></span>
+                <span>📅 待办: <b>${s.todoCount}</b></span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="exportSnapshot('${s.id}')" class="btn-tactile px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">📤 导出此快照</button>
+              <button onclick="restoreSnapshot('${s.id}')" class="btn-tactile px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs">🔄 一键恢复</button>
+            </div>
+          </div>
+        `).join('');
+      }
+      document.getElementById('snapshotModal').classList.add('open');
+    }
+
+    function closeSnapshotModal() {
+      document.getElementById('snapshotModal').classList.remove('open');
+    }
+
+    async function restoreSnapshot(snapId) {
+      const list = await idbGetAllSnapshots();
+      const target = list.find(s => s.id === snapId);
+      if (!target) return;
+
+      const ok = await showConfirm({
+        title: '恢复历史快照',
+        message: `确定要恢复到 ${formatDateTime(target.timestamp)}（${target.reason}）的数据状态吗？当前状态也会自动备份为一个新快照。`,
+        okText: '确认恢复',
+        danger: false
+      });
+      if (!ok) return;
+
+      await createSnapshot('恢复快照前自动备份');
+      appData = normalizeData(target.data);
+      await persistData(true);
+      renderAll();
+      closeSnapshotModal();
+      showToast('已成功恢复至所选历史快照！', 'success');
+    }
+
+    async function exportSnapshot(snapId) {
+      const list = await idbGetAllSnapshots();
+      const target = list.find(s => s.id === snapId);
+      if (!target) return;
+      const blob = new Blob([JSON.stringify(target.data, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `snapshot_${new Date(target.timestamp).toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('已导出该历史快照 JSON', 'success');
+    }
+
+    // =========================================================================
+    // 6. 标签页切换与视图模式切换
+    // =========================================================================
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const active = btn.dataset.tab === tab;
+        btn.classList.toggle('active', active);
+        if (active) {
+          btn.classList.add('bg-blue-600', 'text-white', 'shadow-sm', 'shadow-blue-500/25');
+          btn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+          btn.querySelector('.tab-count').className = 'tab-count px-2 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white';
+        } else {
+          btn.classList.remove('bg-blue-600', 'text-white', 'shadow-sm', 'shadow-blue-500/25');
+          btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+          btn.querySelector('.tab-count').className = 'tab-count px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600';
+        }
+      });
+
+      document.querySelectorAll('.view-section').forEach(sec => {
+        sec.classList.toggle('active', sec.id === `view-${tab}`);
+      });
+    }
+
+    function setViewMode(mod, mode) {
+      viewModes[mod] = mode;
+      savePrefs();
+      updateViewModeButtons(mod);
+      renderRecords(mod);
+    }
+
+    function updateViewModeButtons(mod) {
+      const cardBtn = document.getElementById(`viewBtn-${mod}-card`);
+      const tableBtn = document.getElementById(`viewBtn-${mod}-table`);
+      if (!cardBtn || !tableBtn) return;
+      const isCard = viewModes[mod] === 'card';
+      cardBtn.className = `btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isCard ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`;
+      tableBtn.className = `btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${!isCard ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`;
+    }
+
+    function updateTabCounts() {
+      document.getElementById('tabCount-math').textContent = appData.math.records.length;
+      document.getElementById('tabCount-408').textContent = appData['408'].records.length;
+      document.getElementById('tabCount-todo').textContent = appData.todos.filter(t => !t.completed).length;
+      document.getElementById('tabCount-paper').textContent = appData.papers.length;
+    }
+
+    // =========================================================================
+    // 7. 薄弱点模块（大卡片视图 + 紧凑表格视图）
+    // =========================================================================
+    function populateSubjectFilter(mod) {
+      const sel = document.getElementById(`filter-subject-${mod}`);
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">全部科目</option>' +
+        appData[mod].subjects.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      if (appData[mod].subjects.includes(prev)) sel.value = prev;
+    }
+
+    function renderStats(mod) {
+      const list = appData[mod].records;
+      const total = list.length;
+      const pending = list.filter(r => r.status !== '已掌握').length;
+      const totalForgets = list.reduce((acc, r) => acc + (Number(r.forgetCount) || 1), 0);
+      const highFreq = list.filter(r => (Number(r.forgetCount) || 1) >= 3).length;
+
+      const cards = [
+        { label: '总记录数', value: total, color: 'text-blue-600', bg: 'bg-blue-50', icon: '📚' },
+        { label: '未掌握（待解决/复习中）', value: pending, color: 'text-amber-600', bg: 'bg-amber-50', icon: '⏳' },
+        { label: '累计遗忘次数', value: totalForgets, color: 'text-slate-800', bg: 'bg-slate-100', icon: '🧠' },
+        { label: '高频遗忘（≥3次）', value: highFreq, color: 'text-rose-600', bg: 'bg-rose-50', icon: '🔥' }
+      ];
+
+      document.getElementById(`stats-${mod}`).innerHTML = cards.map((c, i) => `
+        <div class="stat-card bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between" style="--stagger:${i}">
+          <div>
+            <div class="text-xs font-medium text-slate-500 mb-1">${c.label}</div>
+            <div class="text-2xl sm:text-3xl font-extrabold ${c.color} tracking-tight">${c.value}</div>
+          </div>
+          <div class="w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center text-xl">${c.icon}</div>
+        </div>
+      `).join('');
+    }
+
+    function getFilteredRecords(mod) {
+      const subjectVal = document.getElementById(`filter-subject-${mod}`).value;
+      const statusVal = document.getElementById(`filter-status-${mod}`).value;
+      const sortVal = document.getElementById(`sort-${mod}`).value;
+      const kw = document.getElementById(`search-${mod}`).value.trim().toLowerCase();
+
+      let list = [...appData[mod].records];
+      if (subjectVal) list = list.filter(r => r.subject === subjectVal);
+      if (statusVal) list = list.filter(r => r.status === statusVal);
+      if (kw) {
+        list = list.filter(r =>
+          (r.topic || '').toLowerCase().includes(kw) ||
+          (r.source || '').toLowerCase().includes(kw) ||
+          (r.note || '').toLowerCase().includes(kw) ||
+          (r.subject || '').toLowerCase().includes(kw)
+        );
+      }
+
+      list.sort((a, b) => {
+        if (sortVal === 'forgetDesc') {
+          const diff = (b.forgetCount || 1) - (a.forgetCount || 1);
+          if (diff !== 0) return diff;
+          return slashToIso(b.dateStr).localeCompare(slashToIso(a.dateStr));
+        }
+        if (sortVal === 'dateDesc') {
+          return slashToIso(b.dateStr).localeCompare(slashToIso(a.dateStr)) || (b.createdAt || 0) - (a.createdAt || 0);
+        }
+        return slashToIso(b.firstDateStr || b.dateStr).localeCompare(slashToIso(a.firstDateStr || a.dateStr));
+      });
+      return list;
+    }
+
+    function renderRecords(mod, popRecordId = null) {
+      renderStats(mod);
+      updateViewModeButtons(mod);
+      const list = getFilteredRecords(mod);
+      const container = document.getElementById(`records-container-${mod}`);
+      const pagEl = document.getElementById(`pagination-${mod}`);
+
+      if (!list.length) {
+        pagEl.innerHTML = '';
+        container.innerHTML = `
+          <div class="bg-white/95 border border-slate-200/80 rounded-2xl p-14 text-center shadow-sm">
+            <div class="text-4xl mb-3">📭</div>
+            <div class="text-slate-600 font-semibold mb-1">暂无匹配的薄弱点记录</div>
+            <div class="text-xs text-slate-400">可以点击右上角“新增薄弱点”记录今天卡壳的题目或概念</div>
+          </div>`;
+        return;
+      }
+
+      // 分页：仅渲染当前页，统计仍基于全量数据
+      const ps = pageState[mod];
+      const totalPages = Math.max(1, Math.ceil(list.length / ps.size));
+      ps.page = Math.min(Math.max(1, ps.page), totalPages);
+      const start = (ps.page - 1) * ps.size;
+      const pageList = list.slice(start, start + ps.size);
+      renderPaginationBar(mod, list.length, totalPages, pagEl);
+
+      if (viewModes[mod] === 'card') {
+        // ========== 大卡片视图 ==========
+        container.innerHTML = `<div class="knowledge-grid">${pageList.map((r, idx) => {
+          const fc = Number(r.forgetCount) || 1;
+          const isHigh = fc >= 3;
+          const accentClass = r.status === '已掌握'
+            ? 'accent-success'
+            : (isHigh || r.status === '待解决' ? 'accent-danger' : 'accent-warning');
+
+          const fcColor = fc >= 3 ? 'text-rose-600' : (fc === 2 ? 'text-amber-600' : 'text-blue-600');
+          const statusStyle = r.status === '已掌握'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : (r.status === '复习中' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200');
+
+          const subjectBadge = mod === 'math'
+            ? 'bg-blue-50 text-blue-700 border-blue-100'
+            : 'bg-violet-50 text-violet-700 border-violet-100';
+
+          const popClass = popRecordId === r.id ? 'animate-pop' : '';
+
+          return `
+            <article class="k-card ${accentClass} cursor-pointer flex flex-col justify-between gap-4" data-mod="${mod}" data-rid="${r.id}" onclick="cardClick(event,'${mod}','${r.id}')" style="--stagger:${idx}" title="点击卡片放大查看">
+              <!-- Top Row: 科目 / 错误类型 / 来源 / 状态选择器 -->
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="px-2.5 py-1 rounded-lg text-xs font-semibold border ${subjectBadge}">${escapeHtml(r.subject)}</span>
+                  <span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">${escapeHtml(r.type || '未分类')}</span>
+                  ${r.source ? `<span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50/70 text-indigo-600">📌 ${escapeHtml(r.source)}</span>` : ''}
+                </div>
+                <select onchange="changeRecordStatus('${mod}','${r.id}',this.value)"
+                  class="px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer outline-none transition-colors ${statusStyle}">
+                  <option value="待解决" ${r.status === '待解决' ? 'selected' : ''}>🔴 待解决</option>
+                  <option value="复习中" ${r.status === '复习中' ? 'selected' : ''}>🟡 复习中</option>
+                  <option value="已掌握" ${r.status === '已掌握' ? 'selected' : ''}>🟢 已掌握</option>
+                </select>
+              </div>
+
+              <!-- Main Title -->
+              <h3 class="text-[19px] font-bold text-slate-900 leading-[1.4] tracking-tight break-words">
+                ${escapeHtml(r.topic)}
+              </h3>
+
+              <!-- Note / Reflection Box（Markdown 渲染） -->
+              <div class="bg-slate-50/90 border border-slate-200/70 rounded-xl px-3.5 py-3 text-sm leading-relaxed">
+                ${r.note
+                  ? `<div class="md-body text-slate-700">${renderMarkdown(r.note)}</div>`
+                  : `<div class="text-slate-400 italic cursor-pointer hover:text-blue-600 transition-colors" onclick="event.stopPropagation();openRecordModal('${mod}','${r.id}')">暂无反思备注，点击编辑补充...</div>`
+                }
+              </div>
+
+              <!-- Prominent Forget Counter Section -->
+              <div class="flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-blue-50/40 border border-slate-200/70 rounded-xl px-4 py-3">
+                <div class="flex items-baseline gap-2.5">
+                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">累计遗忘</span>
+                  <span class="text-2xl font-extrabold ${fcColor} ${popClass} inline-block tabular-nums">${fc}</span>
+                  <span class="text-xs text-slate-400">次</span>
+                  ${isHigh ? `<span class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">高频易忘</span>` : ''}
+                </div>
+                <button onclick="incrementForget('${mod}','${r.id}')"
+                  class="btn-tactile inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 shadow-xs">
+                  <span>⚡ +1 遗忘</span>
+                </button>
+              </div>
+
+              ${forgetTrailHtml(r)}
+
+              <!-- Bottom Footer: Dates + Action Buttons -->
+              <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
+                  <span>最近：<b class="text-slate-700 font-semibold">${escapeHtml(r.dateStr || '-')}</b></span>
+                  <span class="text-slate-300">|</span>
+                  <span>首次：${escapeHtml(r.firstDateStr || r.dateStr || '-')}</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button onclick="pushRecordToTodo('${mod}','${r.id}')" class="btn-tactile px-2.5 py-1.5 rounded-lg font-medium bg-blue-50 text-blue-700 hover:bg-blue-100">📅 加入待办</button>
+                  <button onclick="openRecordModal('${mod}','${r.id}')" class="btn-tactile px-2.5 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">✏️ 编辑</button>
+                  <button onclick="deleteRecord('${mod}','${r.id}')" class="btn-tactile px-2.5 py-1.5 rounded-lg font-medium bg-rose-50 text-rose-600 hover:bg-rose-100">🗑️ 删除</button>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('')}</div>`;
+      } else {
+        // ========== 紧凑表格视图 ==========
+        container.innerHTML = `
+          <div class="bg-white/95 border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr class="bg-slate-50/90 text-slate-500 text-xs font-semibold border-b border-slate-200">
+                    <th class="py-3.5 px-4 whitespace-nowrap">科目</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">知识点 / 题目</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">错误类型</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">来源</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">状态</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">遗忘次数</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">日期（最近 / 首次）</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">备注</th>
+                    <th class="py-3.5 px-4 whitespace-nowrap">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${pageList.map(r => {
+                    const fc = Number(r.forgetCount) || 1;
+                    const fcColor = fc >= 3 ? 'text-rose-600' : (fc === 2 ? 'text-amber-600' : 'text-blue-600');
+                    const statusStyle = r.status === '已掌握'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : (r.status === '复习中' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700');
+                    const popClass = popRecordId === r.id ? 'animate-pop' : '';
+                    return `
+                      <tr class="hover:bg-blue-50/30 transition-colors">
+                        <td class="py-3 px-4 whitespace-nowrap"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">${escapeHtml(r.subject)}</span></td>
+                        <td class="py-3 px-4 font-semibold text-slate-800 max-w-[260px]">${escapeHtml(r.topic)}</td>
+                        <td class="py-3 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">${escapeHtml(r.type || '未分类')}</span></td>
+                        <td class="py-3 px-4 text-slate-600 whitespace-nowrap">${escapeHtml(r.source || '-')}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                          <select onchange="changeRecordStatus('${mod}','${r.id}',this.value)" class="px-2.5 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer ${statusStyle}">
+                            <option value="待解决" ${r.status === '待解决' ? 'selected' : ''}>待解决</option>
+                            <option value="复习中" ${r.status === '复习中' ? 'selected' : ''}>复习中</option>
+                            <option value="已掌握" ${r.status === '已掌握' ? 'selected' : ''}>已掌握</option>
+                          </select>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                          <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-base ${fcColor} ${popClass} inline-block min-w-[20px] text-center">${fc}</span>
+                            <button onclick="incrementForget('${mod}','${r.id}')" class="btn-tactile px-2 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white">+1 遗忘</button>
+                          </div>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap text-xs">
+                          <div class="font-medium text-slate-700">${escapeHtml(r.dateStr || '-')}</div>
+                          <div class="text-slate-400">首次: ${escapeHtml(r.firstDateStr || r.dateStr || '-')}</div>
+                        </td>
+                        <td class="py-3 px-4 text-xs text-slate-500 max-w-[240px] break-words">${r.note ? `<div class="md-body md-compact">${renderMarkdown(r.note)}</div>` : '-'}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                          <div class="flex items-center gap-1.5">
+                            <button onclick="pushRecordToTodo('${mod}','${r.id}')" class="btn-tactile px-2 py-1 rounded-lg text-xs bg-blue-50 text-blue-700 hover:bg-blue-100">📅 待办</button>
+                            <button onclick="openRecordModal('${mod}','${r.id}')" class="btn-tactile px-2 py-1 rounded-lg text-xs bg-slate-100 text-slate-700 hover:bg-slate-200">编辑</button>
+                            <button onclick="deleteRecord('${mod}','${r.id}')" class="btn-tactile px-2 py-1 rounded-lg text-xs bg-rose-50 text-rose-600 hover:bg-rose-100">删除</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      }
+      // 渲染卡片/表格内的数学公式
+      renderMathIn(container);
+    }
+
+    async function incrementForget(mod, id) {
+      const rec = appData[mod].records.find(r => r.id === id);
+      if (!rec) return;
+      rec.forgetCount = (Number(rec.forgetCount) || 1) + 1;
+      rec.dateStr = isoToSlash(todayISO());
+      if (!Array.isArray(rec.forgetEvents)) rec.forgetEvents = [];
+      rec.forgetEvents.push(Date.now());
+      if (rec.status === '已掌握') rec.status = '复习中';
+      await persistData(true);
+      renderRecords(mod, id);
+      showToast(`「${rec.topic}」遗忘次数 +1（当前 ${rec.forgetCount} 次）`, 'info');
+    }
+
+    async function changeRecordStatus(mod, id, newStatus) {
+      const rec = appData[mod].records.find(r => r.id === id);
+      if (!rec) return;
+      rec.status = newStatus;
+      await persistData(true);
+      renderRecords(mod);
+    }
+
+    async function deleteRecord(mod, id) {
+      const rec = appData[mod].records.find(r => r.id === id);
+      if (!rec) return;
+      const ok = await showConfirm({
+        title: '删除薄弱点记录',
+        message: `确定要删除「${rec.topic}」吗？删除前系统会自动在历史快照中留存备份。`,
+        okText: '确认删除',
+        danger: true
+      });
+      if (!ok) return;
+
+      await createSnapshot(`删除薄弱点前备份`);
+      appData[mod].records = appData[mod].records.filter(r => r.id !== id);
+      await persistData(true);
+      renderRecords(mod);
+      showToast('已删除记录（可通过历史快照恢复）', 'info');
+    }
+
+    async function pushRecordToTodo(mod, id) {
+      const rec = appData[mod].records.find(r => r.id === id);
+      if (!rec) return;
+      const cat = mod === 'math' ? '数学' : '408';
+      appData.todos.push({
+        id: genId('todo'),
+        dateStr: todayISO(),
+        title: `复习【${rec.subject}】${rec.topic}`,
+        category: cat,
+        priority: (rec.forgetCount || 1) >= 3 ? '高' : '中',
+        completed: false,
+        note: rec.note || `来源：${rec.source || '薄弱点追踪'}`,
+        createdAt: Date.now()
+      });
+      await persistData(true);
+      renderTodos();
+      showToast(`已将「${rec.topic}」加入今日待办`, 'success');
+    }
+
+    function openRecordModal(mod, id = '') {
+      document.getElementById('rec-module').value = mod;
+      document.getElementById('rec-id').value = id;
+      recNoteSwitchTab('split'); // 每次打开备注编辑器都回到「分屏实时渲染」
+
+      const subSel = document.getElementById('rec-subject');
+      subSel.innerHTML = appData[mod].subjects.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+
+      if (id) {
+        const rec = appData[mod].records.find(r => r.id === id);
+        document.getElementById('recordModalTitle').textContent = '✏️ 编辑薄弱点';
+        subSel.value = rec.subject;
+        document.getElementById('rec-type').value = rec.type || '知识缺失';
+        document.getElementById('rec-topic').value = rec.topic || '';
+        document.getElementById('rec-source').value = rec.source || '';
+        document.getElementById('rec-status').value = rec.status || '待解决';
+        document.getElementById('rec-forgetCount').value = rec.forgetCount || 1;
+        document.getElementById('rec-date').value = slashToIso(rec.dateStr);
+        document.getElementById('rec-note').value = rec.note || '';
+        document.getElementById('rec-forget-history').innerHTML = forgetHistoryHtml(rec);
+        document.getElementById('rec-forget-history-wrap').classList.remove('hidden');
+      } else {
+        document.getElementById('recordModalTitle').textContent = mod === 'math' ? '📐 新增考研数学薄弱点' : '💻 新增408薄弱点';
+        document.getElementById('rec-type').value = '知识缺失';
+        document.getElementById('rec-topic').value = '';
+        document.getElementById('rec-source').value = '';
+        document.getElementById('rec-status').value = '待解决';
+        document.getElementById('rec-forgetCount').value = '1';
+        document.getElementById('rec-date').value = todayISO();
+        document.getElementById('rec-note').value = '';
+        document.getElementById('rec-forget-history-wrap').classList.add('hidden');
+      }
+      document.getElementById('recordModal').classList.add('open');
+      setTimeout(() => document.getElementById('rec-topic').focus(), 100);
+    }
+
+    function closeRecordModal() {
+      document.getElementById('recordModal').classList.remove('open');
+    }
+
+    async function saveRecordModal() {
+      const mod = document.getElementById('rec-module').value;
+      const id = document.getElementById('rec-id').value;
+      const topic = document.getElementById('rec-topic').value.trim();
+      if (!topic) {
+        showToast('请填写知识点或题目名称', 'warning');
+        return;
+      }
+
+      const dateSlash = isoToSlash(document.getElementById('rec-date').value || todayISO());
+      const forgetCount = Math.max(1, parseInt(document.getElementById('rec-forgetCount').value, 10) || 1);
+
+      if (id) {
+        const rec = appData[mod].records.find(r => r.id === id);
+        if (rec) {
+          rec.subject = document.getElementById('rec-subject').value;
+          rec.type = document.getElementById('rec-type').value;
+          rec.topic = topic;
+          rec.source = document.getElementById('rec-source').value.trim();
+          rec.status = document.getElementById('rec-status').value;
+          rec.forgetCount = forgetCount;
+          rec.dateStr = dateSlash;
+          rec.note = document.getElementById('rec-note').value.trim();
+          if (!Array.isArray(rec.forgetEvents)) rec.forgetEvents = [];
+        }
+      } else {
+        appData[mod].records.unshift({
+          id: genId(mod),
+          subject: document.getElementById('rec-subject').value,
+          topic,
+          type: document.getElementById('rec-type').value,
+          source: document.getElementById('rec-source').value.trim(),
+          status: document.getElementById('rec-status').value,
+          note: document.getElementById('rec-note').value.trim(),
+          forgetCount,
+          forgetEvents: [dateStrToTs(dateSlash)],
+          firstDateStr: dateSlash,
+          dateStr: dateSlash,
+          createdAt: Date.now()
+        });
+      }
+
+      closeRecordModal();
+      await persistData(true);
+      renderRecords(mod);
+      showToast(id ? '已更新薄弱点记录' : '已添加新的薄弱点', 'success');
+    }
+
+    // =========================================================================
+    // 8. 每日待办模块（按日期分组、进度条、顺延）
+    // =========================================================================
+    function toggleTodoDateSort() {
+      todoDateSortOrder = todoDateSortOrder === 'desc' ? 'asc' : 'desc';
+      document.getElementById('todo-sort-btn').textContent = todoDateSortOrder === 'desc'
+        ? '📅 按日期降序（最新在前）↓'
+        : '📅 按日期升序（最早在前）↑';
+      renderTodos();
+    }
+
+    function clearTodoFilters() {
+      document.getElementById('filter-todo-status').value = 'all';
+      document.getElementById('filter-todo-cat').value = '';
+      document.getElementById('filter-todo-date').value = '';
+      document.getElementById('search-todo').value = '';
+      renderTodos();
+    }
+
+    async function quickAddTodo() {
+      const titleEl = document.getElementById('quick-todo-title');
+      const title = titleEl.value.trim();
+      if (!title) {
+        showToast('请输入待办事项内容', 'warning');
+        titleEl.focus();
+        return;
+      }
+
+      appData.todos.push({
+        id: genId('todo'),
+        dateStr: document.getElementById('quick-todo-date').value || todayISO(),
+        title,
+        category: document.getElementById('quick-todo-cat').value,
+        priority: document.getElementById('quick-todo-priority').value,
+        completed: false,
+        note: document.getElementById('quick-todo-note').value.trim(),
+        createdAt: Date.now()
+      });
+
+      titleEl.value = '';
+      document.getElementById('quick-todo-note').value = '';
+      await persistData(true);
+      renderTodos();
+      showToast('已添加待办事项', 'success');
+    }
+
+    async function toggleTodoComplete(id) {
+      const todo = appData.todos.find(t => t.id === id);
+      if (!todo) return;
+      todo.completed = !todo.completed;
+      await persistData(true);
+      renderTodos(id);
+    }
+
+    async function postponeTodoToTomorrow(id) {
+      const todo = appData.todos.find(t => t.id === id);
+      if (!todo) return;
+      const baseDate = todo.dateStr < todayISO() ? todayISO() : todo.dateStr;
+      todo.dateStr = addDaysISO(baseDate, 1);
+      await persistData(true);
+      renderTodos();
+      showToast(`已顺延至 ${isoToSlash(todo.dateStr)}`, 'info');
+    }
+
+    async function deleteTodo(id) {
+      await createSnapshot('删除待办前备份');
+      appData.todos = appData.todos.filter(t => t.id !== id);
+      await persistData(true);
+      renderTodos();
+      showToast('已删除待办（可在历史快照中找回）', 'info');
+    }
+
+    function openTodoModal(id) {
+      const todo = appData.todos.find(t => t.id === id);
+      if (!todo) return;
+      document.getElementById('edit-todo-id').value = todo.id;
+      document.getElementById('edit-todo-date').value = slashToIso(todo.dateStr);
+      document.getElementById('edit-todo-cat').value = todo.category || '综合';
+      document.getElementById('edit-todo-title').value = todo.title || '';
+      document.getElementById('edit-todo-priority').value = todo.priority || '中';
+      document.getElementById('edit-todo-completed').value = String(Boolean(todo.completed));
+      document.getElementById('edit-todo-note').value = todo.note || '';
+      document.getElementById('todoModal').classList.add('open');
+    }
+
+    function closeTodoModal() {
+      document.getElementById('todoModal').classList.remove('open');
+    }
+
+    async function saveTodoModal() {
+      const id = document.getElementById('edit-todo-id').value;
+      const title = document.getElementById('edit-todo-title').value.trim();
+      if (!title) {
+        showToast('待办内容不能为空', 'warning');
+        return;
+      }
+      const todo = appData.todos.find(t => t.id === id);
+      if (todo) {
+        todo.dateStr = document.getElementById('edit-todo-date').value || todayISO();
+        todo.category = document.getElementById('edit-todo-cat').value;
+        todo.title = title;
+        todo.priority = document.getElementById('edit-todo-priority').value;
+        todo.completed = document.getElementById('edit-todo-completed').value === 'true';
+        todo.note = document.getElementById('edit-todo-note').value.trim();
+      }
+      closeTodoModal();
+      await persistData(true);
+      renderTodos();
+      showToast('已保存待办修改', 'success');
+    }
+
+    function renderTodoStats() {
+      const today = todayISO();
+      const all = appData.todos;
+      const todayList = all.filter(t => t.dateStr === today);
+      const todayDone = todayList.filter(t => t.completed).length;
+      const pendingAll = all.filter(t => !t.completed).length;
+      const overdue = all.filter(t => !t.completed && t.dateStr < today).length;
+      const doneAll = all.filter(t => t.completed).length;
+
+      const cards = [
+        { label: '今日待办进度', value: `${todayDone} / ${todayList.length}`, color: 'text-blue-600', bg: 'bg-blue-50', icon: '🎯' },
+        { label: '全部未完成', value: pendingAll, color: 'text-amber-600', bg: 'bg-amber-50', icon: '📝' },
+        { label: '已逾期未完成', value: overdue, color: 'text-rose-600', bg: 'bg-rose-50', icon: '⏰' },
+        { label: '累计已完成', value: doneAll, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: '🏆' }
+      ];
+
+      document.getElementById('stats-todo').innerHTML = cards.map((c, i) => `
+        <div class="stat-card bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between" style="--stagger:${i}">
+          <div>
+            <div class="text-xs font-medium text-slate-500 mb-1">${c.label}</div>
+            <div class="text-2xl sm:text-3xl font-extrabold ${c.color} tracking-tight">${c.value}</div>
+          </div>
+          <div class="w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center text-xl">${c.icon}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderTodos(popTodoId = null) {
+      renderTodoStats();
+      const statusFilter = document.getElementById('filter-todo-status').value;
+      const catFilter = document.getElementById('filter-todo-cat').value;
+      const dateFilter = document.getElementById('filter-todo-date').value;
+      const kw = document.getElementById('search-todo').value.trim().toLowerCase();
+
+      let list = [...appData.todos];
+      if (statusFilter === 'pending') list = list.filter(t => !t.completed);
+      if (statusFilter === 'done') list = list.filter(t => t.completed);
+      if (catFilter) list = list.filter(t => t.category === catFilter);
+      if (dateFilter) list = list.filter(t => t.dateStr === dateFilter);
+      if (kw) {
+        list = list.filter(t =>
+          (t.title || '').toLowerCase().includes(kw) ||
+          (t.note || '').toLowerCase().includes(kw) ||
+          (t.category || '').toLowerCase().includes(kw)
+        );
+      }
+
+      const container = document.getElementById('todo-groups-container');
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="bg-white/95 border border-slate-200/80 rounded-2xl p-14 text-center shadow-sm">
+            <div class="text-4xl mb-3">🗓️</div>
+            <div class="text-slate-600 font-semibold mb-1">暂无待办事项</div>
+            <div class="text-xs text-slate-400">在上方快速添加今天的考研复习计划，或从数学/408薄弱点一键加入待办 ✨</div>
+          </div>`;
+        return;
+      }
+
+      const groupsMap = {};
+      list.forEach(t => {
+        const d = slashToIso(t.dateStr);
+        if (!groupsMap[d]) groupsMap[d] = [];
+        groupsMap[d].push(t);
+      });
+
+      const sortedDates = Object.keys(groupsMap).sort((a, b) =>
+        todoDateSortOrder === 'desc' ? b.localeCompare(a) : a.localeCompare(b)
+      );
+
+      const today = todayISO();
+      const tomorrow = addDaysISO(today, 1);
+      const priorityRank = { '高': 1, '中': 2, '低': 3 };
+
+      const catStyles = {
+        '数学': 'bg-blue-50 text-blue-700',
+        '408': 'bg-violet-50 text-violet-700',
+        '英语': 'bg-cyan-50 text-cyan-700',
+        '政治': 'bg-rose-50 text-rose-700',
+        '综合': 'bg-slate-100 text-slate-600'
+      };
+
+      const prioStyles = {
+        '高': 'bg-rose-50 text-rose-600 border border-rose-200/70',
+        '中': 'bg-amber-50 text-amber-700 border border-amber-200/70',
+        '低': 'bg-slate-100 text-slate-500 border border-slate-200/70'
+      };
+
+      container.innerHTML = sortedDates.map((dateIso, gIdx) => {
+        const items = groupsMap[dateIso].sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          const pDiff = (priorityRank[a.priority] || 2) - (priorityRank[b.priority] || 2);
+          if (pDiff !== 0) return pDiff;
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
+
+        const doneCount = items.filter(i => i.completed).length;
+        const pct = Math.round((doneCount / items.length) * 100);
+        const hasPending = doneCount < items.length;
+
+        let tagHtml = '';
+        if (dateIso === today) {
+          tagHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">今天</span>`;
+        } else if (dateIso === tomorrow) {
+          tagHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700">明天</span>`;
+        } else if (dateIso < today && hasPending) {
+          tagHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700">有未完成</span>`;
+        } else if (dateIso < today) {
+          tagHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">已归档</span>`;
+        } else {
+          tagHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">计划中</span>`;
+        }
+
+        const itemsHtml = items.map(t => {
+          const popClass = popTodoId === t.id ? 'animate-pop' : '';
+          return `
+            <li class="flex flex-wrap sm:flex-nowrap items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 last:border-b-0 transition-all ${t.completed ? 'bg-slate-50/60 opacity-75' : 'hover:bg-blue-50/25'}">
+              <div class="flex items-start gap-3.5 flex-1 min-w-0">
+                <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTodoComplete('${t.id}')"
+                  class="mt-1 w-5 h-5 rounded-md accent-blue-600 cursor-pointer flex-shrink-0 ${popClass}" />
+                <div class="flex-1 min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-lg text-xs font-semibold ${catStyles[t.category] || catStyles['综合']}">${escapeHtml(t.category || '综合')}</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[11px] font-semibold ${prioStyles[t.priority] || prioStyles['中']}">${escapeHtml(t.priority || '中')}优</span>
+                    <span class="text-[15px] font-semibold break-words ${t.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${escapeHtml(t.title)}</span>
+                  </div>
+                  ${t.note ? `<div class="text-xs text-slate-500 mt-1.5 break-words">${escapeHtml(t.note)}</div>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 flex-shrink-0 ml-8 sm:ml-0">
+                ${!t.completed ? `<button onclick="postponeTodoToTomorrow('${t.id}')" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100" title="顺延到下一天">顺延</button>` : ''}
+                <button onclick="openTodoModal('${t.id}')" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">编辑</button>
+                <button onclick="deleteTodo('${t.id}')" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-600 hover:bg-rose-100">删除</button>
+              </div>
+            </li>
+          `;
+        }).join('');
+
+        return `
+          <div class="todo-date-group bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden" style="--stagger:${gIdx}">
+            <div class="px-5 py-3.5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <span class="text-base font-bold text-slate-800">📅 ${isoToSlash(dateIso)}</span>
+                <span class="text-sm font-medium text-slate-500">${getWeekday(dateIso)}</span>
+                ${tagHtml}
+              </div>
+              <div class="flex items-center gap-3 text-xs font-medium text-slate-500">
+                <span>已完成 <b class="text-slate-800">${doneCount}</b> / ${items.length}</span>
+                <div class="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-300" style="width:${pct}%"></div>
+                </div>
+              </div>
+            </div>
+            <ul>${itemsHtml}</ul>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // 8.5 套卷模块（408 / 数学：小题大题分数 + 错误题一键加入遗忘点）
+    // =========================================================================
+    function paperTotal(p) {
+      return (p.smallScore || 0) + (p.bigScore || 0);
+    }
+
+    function populatePaperCatFilter() {
+      const sel = document.getElementById('filter-paper-cat');
+      const prev = sel.value;
+      const cats = [...new Set(appData.papers.map(p => p.category).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">全部系列</option>' +
+        cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      if (cats.includes(prev)) sel.value = prev;
+    }
+
+    function renderPaperStats() {
+      const list = appData.papers;
+      const mathCount = list.filter(p => p.mod === 'math').length;
+      const csCount = list.filter(p => p.mod === '408').length;
+      const errTotal = list.reduce((a, p) => a + (p.errors ? p.errors.length : 0), 0);
+      const cards = [
+        { label: '总套卷数', value: list.length, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: '📝' },
+        { label: '数学套卷', value: mathCount, color: 'text-blue-600', bg: 'bg-blue-50', icon: '📐' },
+        { label: '408 套卷', value: csCount, color: 'text-violet-600', bg: 'bg-violet-50', icon: '💻' },
+        { label: '错误题总数', value: errTotal, color: 'text-rose-600', bg: 'bg-rose-50', icon: '❌' }
+      ];
+      document.getElementById('stats-paper').innerHTML = cards.map((c, i) => `
+        <div class="stat-card bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between" style="--stagger:${i}">
+          <div>
+            <div class="text-xs font-medium text-slate-500 mb-1">${c.label}</div>
+            <div class="text-2xl sm:text-3xl font-extrabold ${c.color} tracking-tight">${c.value}</div>
+          </div>
+          <div class="w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center text-xl">${c.icon}</div>
+        </div>
+      `).join('');
+    }
+
+    function getFilteredPapers() {
+      const modVal = document.getElementById('filter-paper-mod').value;
+      const catVal = document.getElementById('filter-paper-cat').value;
+      const sortVal = document.getElementById('sort-paper').value;
+      const kw = document.getElementById('search-paper').value.trim().toLowerCase();
+
+      let list = [...appData.papers];
+      if (modVal) list = list.filter(p => p.mod === modVal);
+      if (catVal) list = list.filter(p => p.category === catVal);
+      if (kw) {
+        list = list.filter(p =>
+          (p.name || '').toLowerCase().includes(kw) ||
+          (p.category || '').toLowerCase().includes(kw) ||
+          (p.note || '').toLowerCase().includes(kw) ||
+          (p.errors || []).some(e => (e.point || '').toLowerCase().includes(kw) || (e.qno || '').toLowerCase().includes(kw))
+        );
+      }
+      list.sort((a, b) => {
+        if (sortVal === 'scoreDesc') return paperTotal(b) - paperTotal(a) || slashToIso(b.dateStr).localeCompare(slashToIso(a.dateStr));
+        if (sortVal === 'scoreAsc') return paperTotal(a) - paperTotal(b) || slashToIso(b.dateStr).localeCompare(slashToIso(a.dateStr));
+        return slashToIso(b.dateStr).localeCompare(slashToIso(a.dateStr)) || (b.createdAt || 0) - (a.createdAt || 0);
+      });
+      return list;
+    }
+
+    function paperCardHtml(p, idx) {
+      const modBadge = p.mod === 'math'
+        ? 'bg-blue-50 text-blue-700 border-blue-100'
+        : 'bg-violet-50 text-violet-700 border-violet-100';
+      const modLabel = p.mod === 'math' ? '📐 数学' : '💻 408';
+      const fmt = v => (v === null || v === undefined) ? '—' : v;
+      const hasScore = p.smallScore !== null || p.bigScore !== null;
+      const total = hasScore ? paperTotal(p) : '—';
+      const time = p.timeUsed === null ? '—' : `${p.timeUsed}′`;
+      const errors = p.errors || [];
+
+      const scoreCell = (label, val, cls) => `
+        <div class="bg-slate-50/80 border border-slate-200/70 rounded-xl px-2 py-2.5 text-center">
+          <div class="text-[11px] text-slate-500 mb-0.5">${label}</div>
+          <div class="text-lg font-extrabold ${cls} tabular-nums leading-none">${val}</div>
+        </div>`;
+
+      const errorsHtml = errors.length ? errors.map(e => `
+        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200/70 bg-slate-50/60">
+          <span class="shrink-0 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-xs font-bold text-slate-700">${e.qno ? '题 ' + escapeHtml(e.qno) : '—'}</span>
+          ${e.sub ? `<span class="shrink-0 px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[11px] font-medium">${escapeHtml(e.sub)}</span>` : ''}
+          <span class="flex-1 text-sm text-slate-700 break-words">${e.point ? escapeHtml(e.point) : '<span class="text-slate-400 italic">未填写错误点</span>'}</span>
+          ${e.addedToTracker
+            ? '<span class="shrink-0 text-xs font-semibold text-emerald-600">✓ 已加入</span>'
+            : `<button onclick="pushErrorToTracker('${p.id}','${e.id}')" class="shrink-0 btn-tactile px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs">＋ 遗忘点</button>`}
+        </div>`).join('')
+        : '<div class="text-xs text-slate-400 italic px-1">暂无错误题，点击 ✏️ 编辑添加</div>';
+
+      return `
+        <article class="bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl shadow-sm p-5 flex flex-col gap-3.5" style="--stagger:${idx}">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg text-xs font-semibold border ${modBadge}">${modLabel}</span>
+              ${p.category ? `<span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50/70 text-indigo-600">📌 ${escapeHtml(p.category)}</span>` : ''}
+              <span class="text-xs text-slate-400">📅 ${escapeHtml(p.dateStr)}</span>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="openPaperModal('${p.id}')" title="编辑" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-blue-600">✏️</button>
+              <button onclick="deletePaper('${p.id}')" title="删除" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600">🗑️</button>
+            </div>
+          </div>
+
+          <h3 class="text-[19px] font-bold text-slate-900 leading-[1.4] tracking-tight break-words">${escapeHtml(p.name)}</h3>
+
+          <div class="grid grid-cols-4 gap-2">
+            ${scoreCell('小题', fmt(p.smallScore), 'text-slate-800')}
+            ${scoreCell('大题', fmt(p.bigScore), 'text-slate-800')}
+            ${scoreCell('总分', total, 'text-emerald-600')}
+            ${scoreCell('用时', time, 'text-blue-600')}
+          </div>
+
+          ${p.note ? `<div class="bg-slate-50/90 border border-slate-200/70 rounded-xl px-3.5 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(p.note)}</div>` : ''}
+
+          <div>
+            <div class="text-xs font-semibold text-slate-500 mb-1.5">错误题（${errors.length}）</div>
+            <div class="space-y-1.5">${errorsHtml}</div>
+          </div>
+        </article>`;
+    }
+
+    function renderPapers() {
+      populatePaperCatFilter();
+      renderPaperStats();
+      const list = getFilteredPapers();
+      const container = document.getElementById('papers-container');
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="bg-white/95 border border-slate-200/80 rounded-2xl p-14 text-center shadow-sm">
+            <div class="text-4xl mb-3">📭</div>
+            <div class="text-slate-600 font-semibold mb-1">暂无套卷记录</div>
+            <div class="text-xs text-slate-400">点击右上角“新增套卷”，记录小题/大题分数与错误题</div>
+          </div>`;
+        return;
+      }
+      container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${list.map((p, idx) => paperCardHtml(p, idx)).join('')}</div>`;
+    }
+
+    function openPaperModal(id = '') {
+      document.getElementById('paper-id').value = id;
+      const modSel = document.getElementById('paper-mod');
+      if (id) {
+        const p = appData.papers.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById('paperModalTitle').textContent = '✏️ 编辑套卷';
+        modSel.value = p.mod;
+        document.getElementById('paper-name').value = p.name || '';
+        document.getElementById('paper-category').value = p.category || '';
+        document.getElementById('paper-small').value = p.smallScore === null ? '' : p.smallScore;
+        document.getElementById('paper-big').value = p.bigScore === null ? '' : p.bigScore;
+        document.getElementById('paper-time').value = p.timeUsed === null ? '' : p.timeUsed;
+        document.getElementById('paper-date').value = slashToIso(p.dateStr);
+        document.getElementById('paper-note').value = p.note || '';
+        paperDraftErrors = (p.errors || []).map(e => ({ ...e }));
+      } else {
+        document.getElementById('paperModalTitle').textContent = '📝 新增套卷';
+        modSel.value = '408';
+        document.getElementById('paper-name').value = '';
+        document.getElementById('paper-category').value = '';
+        document.getElementById('paper-small').value = '';
+        document.getElementById('paper-big').value = '';
+        document.getElementById('paper-time').value = '';
+        document.getElementById('paper-date').value = todayISO();
+        document.getElementById('paper-note').value = '';
+        paperDraftErrors = [];
+      }
+      renderPaperErrorRows();
+      document.getElementById('paperModal').classList.add('open');
+      setTimeout(() => document.getElementById('paper-name').focus(), 100);
+    }
+
+    function closePaperModal() {
+      document.getElementById('paperModal').classList.remove('open');
+    }
+
+    function onPaperModChange() {
+      renderPaperErrorRows();
+    }
+
+    function renderPaperErrorRows() {
+      const mod = document.getElementById('paper-mod').value;
+      const subjects = appData[mod].subjects;
+      const container = document.getElementById('paper-errors-container');
+      if (!paperDraftErrors.length) {
+        container.innerHTML = '<div class="text-xs text-slate-400 italic px-1 py-2">暂无错误题，点击右上角“添加错误题”记录题号与错误点</div>';
+        return;
+      }
+      container.innerHTML = paperDraftErrors.map(e => {
+        const opts = '<option value="">未分科目</option>' +
+          subjects.map(s => `<option value="${escapeHtml(s)}" ${e.sub === s ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('');
+        return `
+          <div class="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/60">
+            <input type="text" value="${escapeHtml(e.qno)}" oninput="updatePaperDraft('${e.id}','qno',this.value)" placeholder="题号"
+              class="w-16 px-2 py-1.5 rounded-lg border border-slate-200 text-sm focus:border-blue-500 outline-none" />
+            <select onchange="updatePaperDraft('${e.id}','sub',this.value)" class="px-2 py-1.5 rounded-lg border border-slate-200 text-sm focus:border-blue-500 outline-none">${opts}</select>
+            <input type="text" value="${escapeHtml(e.point)}" oninput="updatePaperDraft('${e.id}','point',this.value)" placeholder="错误点 / 知识点"
+              class="flex-1 min-w-[140px] px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm focus:border-blue-500 outline-none" />
+            ${e.addedToTracker ? '<span class="text-xs font-semibold text-emerald-600 shrink-0">✓ 已加入</span>' : ''}
+            <button onclick="removePaperErrorRow('${e.id}')" class="btn-tactile shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600">✕</button>
+          </div>`;
+      }).join('');
+    }
+
+    function addPaperErrorRow() {
+      paperDraftErrors.push({ id: genId('err'), qno: '', point: '', sub: '', addedToTracker: false });
+      renderPaperErrorRows();
+    }
+
+    function removePaperErrorRow(id) {
+      paperDraftErrors = paperDraftErrors.filter(e => e.id !== id);
+      renderPaperErrorRows();
+    }
+
+    function updatePaperDraft(id, field, val) {
+      const e = paperDraftErrors.find(x => x.id === id);
+      if (e) e[field] = val;
+    }
+
+    async function savePaperModal() {
+      const id = document.getElementById('paper-id').value;
+      const name = document.getElementById('paper-name').value.trim();
+      if (!name) {
+        showToast('请填写套卷名称', 'warning');
+        return;
+      }
+      const numOrNull = v => {
+        const t = String(v).trim();
+        if (t === '') return null;
+        const n = Number(t);
+        return isNaN(n) ? null : n;
+      };
+      const data = {
+        mod: document.getElementById('paper-mod').value,
+        name,
+        category: document.getElementById('paper-category').value.trim(),
+        smallScore: numOrNull(document.getElementById('paper-small').value),
+        bigScore: numOrNull(document.getElementById('paper-big').value),
+        timeUsed: numOrNull(document.getElementById('paper-time').value),
+        dateStr: isoToSlash(document.getElementById('paper-date').value || todayISO()),
+        note: document.getElementById('paper-note').value.trim(),
+        errors: paperDraftErrors
+          .filter(e => (e.qno || '').trim() || (e.point || '').trim())
+          .map(e => ({ id: e.id, qno: (e.qno || '').trim(), point: (e.point || '').trim(), sub: e.sub || '', addedToTracker: Boolean(e.addedToTracker) }))
+      };
+      if (id) {
+        const p = appData.papers.find(x => x.id === id);
+        if (p) Object.assign(p, data);
+      } else {
+        appData.papers.unshift({ id: genId('paper'), ...data, createdAt: Date.now() });
+      }
+      closePaperModal();
+      await persistData(true);
+      renderPapers();
+      updateTabCounts();
+      showToast(id ? '已更新套卷' : '已添加套卷', 'success');
+    }
+
+    async function deletePaper(id) {
+      const p = appData.papers.find(x => x.id === id);
+      if (!p) return;
+      const ok = await showConfirm({
+        title: '删除套卷',
+        message: `确定要删除「${p.name}」吗？其错误题记录会一并删除（已加入遗忘点的记录不受影响）。删除前会自动留存历史快照。`,
+        okText: '确认删除',
+        danger: true
+      });
+      if (!ok) return;
+      await createSnapshot('删除套卷前备份');
+      appData.papers = appData.papers.filter(x => x.id !== id);
+      await persistData(true);
+      renderPapers();
+      updateTabCounts();
+      showToast('已删除套卷（可通过历史快照恢复）', 'info');
+    }
+
+    async function pushErrorToTracker(paperId, errId) {
+      const paper = appData.papers.find(p => p.id === paperId);
+      if (!paper) return;
+      const err = (paper.errors || []).find(e => e.id === errId);
+      if (!err || err.addedToTracker) return;
+      const mod = paper.mod;
+      const dateSlash = isoToSlash(todayISO());
+      const subject = err.sub || appData[mod].subjects[0];
+      const topic = err.point || `第 ${err.qno || '?'} 题`;
+      appData[mod].records.unshift({
+        id: genId(mod),
+        subject,
+        topic,
+        type: '知识缺失',
+        source: paper.category || '',
+        status: '待解决',
+        note: `来自套卷「${paper.name}」${err.qno ? '第 ' + err.qno + ' 题' : ''}`.trim(),
+        forgetCount: 1,
+        forgetEvents: [dateStrToTs(dateSlash)],
+        firstDateStr: dateSlash,
+        dateStr: dateSlash,
+        createdAt: Date.now()
+      });
+      err.addedToTracker = true;
+      await persistData(true);
+      renderRecords(mod);
+      renderPapers();
+      updateTabCounts();
+      showToast(`已将「${topic}」加入${mod === 'math' ? '数学' : '408'}遗忘点`, 'success');
+    }
+
+    function renderAll() {
+      populateSubjectFilter('math');
+      populateSubjectFilter('408');
+      renderRecords('math');
+      renderRecords('408');
+      renderTodos();
+      renderPapers();
+      updateTabCounts();
+    }
+
+    // =========================================================================
+    // 9. 快捷键 (Ctrl+S / Cmd+S) 与离开提醒
+    // =========================================================================
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        manualSave();
+      }
+      if (e.key === 'Escape') {
+        closeRecordModal();
+        closeTodoModal();
+        closePaperModal();
+        closeSnapshotModal();
+        closeConfirmModal(false);
+      }
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // =========================================================================
+    // 10. 启动初始化流程
+    // =========================================================================
+    async function initApp() {
+      loadPrefs();
+      document.getElementById('quick-todo-date').value = todayISO();
+
+      // 1. 打开 IndexedDB
+      dbInstance = await openDatabase();
+
+      // 2. 加载数据：优先 IndexedDB -> 其次 v4 localStorage -> 其次 v3 localStorage 迁移 -> 默认数据
+      let loaded = await idbGet('state', 'current');
+      if (!loaded) {
+        try {
+          const rawV4 = localStorage.getItem(LS_KEY_V4);
+          const rawV3 = localStorage.getItem(LS_KEY_V3);
+          if (rawV4) loaded = JSON.parse(rawV4);
+          else if (rawV3) loaded = JSON.parse(rawV3);
+        } catch {}
+      }
+      appData = normalizeData(loaded || DEFAULT_DATA);
+
+      // 3. 检查是否记忆了本地 JSON 文件句柄
+      const savedHandle = await idbGet('handles', 'jsonFile');
+      if (savedHandle && typeof savedHandle.queryPermission === 'function') {
+        try {
+          const perm = await savedHandle.queryPermission({ mode: 'readwrite' });
+          if (perm === 'granted') {
+            fileHandle = savedHandle;
+          } else {
+            pendingSavedHandle = savedHandle;
+          }
+        } catch {
+          pendingSavedHandle = savedHandle;
+        }
+      }
+
+      // 4. 初始化样式与渲染
+      switchTab('math');
+      updateSyncUI();
+      await refreshSnapshotCount();
+      renderAll();
+    }
+
+    initApp();
+  </script>
+</body>
+</html>

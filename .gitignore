@@ -1,0 +1,20 @@
+# 依赖与构建产物
+node_modules/
+dist/
+*.zip
+
+# 运行时与临时文件
+*.crswap
+*.tmp
+zz_*
+_tmp_*
+install-run.cmd
+install.pid
+_pushwork/
+
+# 工具缓存与运行时备份
+.workbuddy/
+backup/
+# 桌宠源码（非本网站文件）
+zhuochong版本/# 个人数据（不入库）
+shiyiyue_zhishidian2.json
