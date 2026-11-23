@@ -345,6 +345,16 @@
 
       <!-- 存储状态与操作按钮区 -->
       <div class="flex flex-wrap items-center gap-2">
+        <!-- 考试倒计时（每秒刷新） -->
+        <div id="examCountdown" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 shadow-xs" title="距离 2026年12月19日 06:00">
+          <span class="text-sm">⏳</span>
+          <span class="text-xs font-semibold text-rose-600 hidden md:inline">距考试</span>
+          <span class="tabular-nums text-sm font-extrabold text-rose-700" id="cdDays">--</span><span class="text-[11px] text-rose-500 font-medium">天</span>
+          <span class="tabular-nums text-sm font-extrabold text-rose-700" id="cdHours">--</span><span class="text-[11px] text-rose-500 font-medium">时</span>
+          <span class="tabular-nums text-sm font-extrabold text-rose-700" id="cdMins">--</span><span class="text-[11px] text-rose-500 font-medium">分</span>
+          <span class="tabular-nums text-sm font-extrabold text-rose-700" id="cdSecs">--</span><span class="text-[11px] text-rose-500 font-medium">秒</span>
+        </div>
+      </div>
         <!-- 同步状态徽章 -->
         <span id="syncBadge" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 transition-all">
           <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
@@ -507,10 +517,11 @@
 
     <!-- ==================== VIEW 3: 每日待办 ==================== -->
     <section id="view-todo" class="view-section">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-todo"></div>
-
-      <!-- 月度待办热力图 -->
-      <div id="todo-heatmap" class="mb-5"></div>
+      <!-- 统计条（左，4 条竖叠、自动撑满热力图高度）+ 热力图（右，固定宽度），小屏自动上下堆叠 -->
+      <div class="flex flex-col lg:flex-row gap-4 mb-5">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-1 lg:auto-rows-fr lg:flex-1 min-w-0" id="stats-todo"></div>
+        <div id="todo-heatmap" class="min-w-0 lg:w-[28rem] shrink-0"></div>
+      </div>
 
       <!-- 快速添加待办 -->
       <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 sm:p-5 mb-5">
@@ -2739,12 +2750,12 @@
       ];
 
       document.getElementById('stats-todo').innerHTML = cards.map((c, i) => `
-        <div class="stat-card bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm flex items-center justify-between" style="--stagger:${i}">
+        <div class="stat-card bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center justify-between" style="--stagger:${i}">
           <div>
-            <div class="text-xs font-medium text-slate-500 mb-1">${c.label}</div>
-            <div class="text-2xl sm:text-3xl font-extrabold ${c.color} tracking-tight">${c.value}</div>
+            <div class="text-[11px] font-medium text-slate-500 mb-0.5">${c.label}</div>
+            <div class="text-2xl font-extrabold ${c.color} tracking-tight">${c.value}</div>
           </div>
-          <div class="w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center text-xl">${c.icon}</div>
+          <div class="w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center text-lg">${c.icon}</div>
         </div>
       `).join('');
     }
@@ -2809,13 +2820,12 @@
           <div class="relative aspect-square rounded-lg border flex flex-col items-center justify-center cursor-default transition-transform hover:scale-110 hover:z-10 shadow-xs ${cellColors[lv]} ${dow >= 5 ? 'opacity-90' : ''} ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}"
             title="${month}月${d}日：${n} 条待办${n > 0 && d === maxDay ? ' · 本月最多' : ''}">
             <span class="text-xs sm:text-sm font-semibold leading-none">${d}</span>
-            ${n ? `<span class="text-[9px] sm:text-[10px] font-bold leading-none mt-1">${n}条</span>` : ''}
           </div>`);
       }
 
       const isCurrentMonth = ym === today.slice(0, 7);
       el.innerHTML = `
-        <div class="bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm">
+        <div class="bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 shadow-sm max-w-md mx-auto">
           <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h3 class="text-sm sm:text-base font-bold text-slate-800">🗓️ 待办热力图 <span class="text-xs font-normal text-slate-400">· 格子颜色越深，当天待办越多</span></h3>
@@ -3431,7 +3441,31 @@
     // =========================================================================
     // 10. 启动初始化流程
     // =========================================================================
-        // 应用启动入口：建库 → 加载数据 → 恢复文件句柄 → 首次全量渲染
+        // ============ 考试倒计时（目标 2026-12-19 06:00，每秒刷新） ============
+    const EXAM_TARGET = new Date('2026-12-19T06:00:00');
+    let countdownTimer = null;
+    function updateCountdown() {
+      let diff = Math.floor((EXAM_TARGET - Date.now()) / 1000); // 剩余总秒数
+      const el = document.getElementById('examCountdown');
+      if (diff <= 0) {
+        // 已到达/已过考试时间：显示提示并停止刷新
+        el.innerHTML = '<span class="text-sm">🎓</span><span class="text-xs sm:text-sm font-bold text-emerald-700">考试已开始，加油！</span>';
+        if (countdownTimer) clearInterval(countdownTimer);
+        return;
+      }
+      const d = Math.floor(diff / 86400); diff -= d * 86400;
+      const h = Math.floor(diff / 3600);  diff -= h * 3600;
+      const m = Math.floor(diff / 60);
+      const s = diff - m * 60;
+      document.getElementById('cdDays').textContent = d;
+      document.getElementById('cdHours').textContent = String(h).padStart(2, '0');
+      document.getElementById('cdMins').textContent = String(m).padStart(2, '0');
+      document.getElementById('cdSecs').textContent = String(s).padStart(2, '0');
+    }
+    updateCountdown();
+    countdownTimer = setInterval(updateCountdown, 1000);
+
+    // 应用启动入口：建库 → 加载数据 → 恢复文件句柄 → 首次全量渲染
     async function initApp() {
       loadPrefs();
       document.getElementById('quick-todo-date').value = todayISO();
