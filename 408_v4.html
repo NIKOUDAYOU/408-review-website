@@ -2546,8 +2546,8 @@
     async function postponeTodoToTomorrow(id) {
       const todo = appData.todos.find(t => t.id === id);
       if (!todo) return;
-      const baseDate = todo.dateStr < todayISO() ? todayISO() : todo.dateStr;
-      todo.dateStr = addDaysISO(baseDate, 1);
+      // 直接在待办自身日期上加一天：22 号没完成顺延到 23 号，而不是今天(23)的明天
+      todo.dateStr = addDaysISO(todo.dateStr, 1);
       await persistData(true);
       renderTodos();
       showToast(`已顺延至 ${isoToSlash(todo.dateStr)}`, 'info');
