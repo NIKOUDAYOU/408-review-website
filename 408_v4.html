@@ -509,6 +509,9 @@
     <section id="view-todo" class="view-section">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-todo"></div>
 
+      <!-- 月度待办热力图 -->
+      <div id="todo-heatmap" class="mb-5"></div>
+
       <!-- 快速添加待办 -->
       <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 sm:p-5 mb-5">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
@@ -576,6 +579,9 @@
     <!-- ==================== VIEW 4: 套卷记录 ==================== -->
     <section id="view-paper" class="view-section">
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-paper"></div>
+
+      <!-- 平均分统计图表 -->
+      <div id="score-chart" class="mb-5"></div>
 
       <!-- 工具栏 -->
       <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -969,6 +975,7 @@
     let pendingSavedHandle = null; // 刷新后从 IndexedDB 恢复的句柄（等待用户点击授权）
     let isDirty = false; // 是否有尚未手动保存/写盘的修改
     let todoDateSortOrder = 'desc';
+    let heatmapYM = ''; // 热力图当前查看的月份（YYYY-MM），空 = 当月
     let viewModes = { math: 'card', '408': 'card' }; // 默认大卡片视图
     let pageState = { math: { page: 1, size: 20 }, '408': { page: 1, size: 20 } }; // 分页状态
     let paperDraftErrors = []; // 套卷弹窗中正在编辑的错误题草稿
@@ -978,6 +985,7 @@
     // =========================================================================
     // 2. IndexedDB 封装（Tier 1: 主存储 + 文件句柄记忆 + 滚动历史快照）
     // =========================================================================
+        // 打开 IndexedDB 主库：建 state/handles/snapshots 三个存储；不可用时降级返回 null
     function openDatabase() {
       return new Promise((resolve) => {
         if (!window.indexedDB) {
@@ -1007,6 +1015,8 @@
       });
     }
 
+
+    // 从 IndexedDB 指定存储读取一个键值，失败返回 null
     function idbGet(storeName, key) {
       return new Promise((resolve) => {
         if (!dbInstance) return resolve(null);
@@ -1021,6 +1031,8 @@
       });
     }
 
+
+    // 向 IndexedDB 指定存储写入一个值，可指定键；返回是否成功
     function idbPut(storeName, value, key = undefined) {
       return new Promise((resolve) => {
         if (!dbInstance) return resolve(false);
@@ -1036,6 +1048,8 @@
       });
     }
 
+
+    // 读取全部历史快照并按时间倒序返回
     function idbGetAllSnapshots() {
       return new Promise((resolve) => {
         if (!dbInstance) return resolve([]);
@@ -1054,6 +1068,8 @@
       });
     }
 
+
+    // 生成一条历史快照（含全量数据深拷贝），并滚动保留最近 MAX_SNAPSHOTS 条
     async function createSnapshot(reason = '手动保存') {
       if (!dbInstance) return;
       const snap = {
@@ -1082,6 +1098,8 @@
       await refreshSnapshotCount();
     }
 
+
+    // 刷新顶部“历史快照”按钮上的数量徽章
     async function refreshSnapshotCount() {
       const all = await idbGetAllSnapshots();
       const badge = document.getElementById('snapshotCountBadge');
@@ -1096,11 +1114,15 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+
+    // ISO 日期（YYYY-MM-DD）转斜杠格式（YYYY/MM/DD）
     function isoToSlash(iso) {
       if (!iso) return todayISO().replace(/-/g, '/');
       return iso.replace(/-/g, '/');
     }
 
+
+    // 任意斜杠/短横线日期统一规范化为 ISO 格式
     function slashToIso(str) {
       if (!str) return todayISO();
       const parts = String(str).replace(/\//g, '-').split('-');
@@ -1108,28 +1130,38 @@
       return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
     }
 
+
+    // 在 ISO 日期上加/减若干天，返回新的 ISO 日期
     function addDaysISO(iso, days) {
       const [y, m, d] = iso.split('-').map(Number);
       const dt = new Date(y, m - 1, d + days);
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
     }
 
+
+    // 取 ISO 日期对应的中文星期几
     function getWeekday(iso) {
       const [y, m, d] = iso.split('-').map(Number);
       const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
       return days[new Date(y, m - 1, d).getDay()];
     }
 
+
+    // 时间戳格式化为可读的“月-日 时:分”文本
     function formatDateTime(ts) {
       const d = new Date(ts);
       const pad = n => String(n).padStart(2, '0');
       return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
+
+    // 生成带前缀的唯一 ID（时间戳 + 随机串）
     function genId(prefix) {
       return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     }
 
+
+    // HTML 转义：防止备注/标题等用户输入被当作标签执行（XSS 防护）
     function escapeHtml(str) {
       return String(str || '')
         .replace(/&/g, '&amp;')
@@ -1140,6 +1172,7 @@
 
     // ===================== Markdown 渲染（备注 / 反思专用） =====================
     // 行内语法：输入已 escapeHtml，输出安全 HTML
+        // Markdown 行内语法解析（加粗/斜体/删除线/代码/链接），输入为已转义文本
     function mdInline(s) {
       return s
         .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
@@ -1154,6 +1187,7 @@
     }
 
     // 块级解析：标题 / 列表 / 引用 / 代码块 / 表格 / 分隔线 / 段落（单换行 → <br>）
+        // Markdown 块级解析主循环：标题/列表/引用/代码块/表格/分隔线/段落
     function mdRender(src) {
       const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
       const out = [];
@@ -1254,6 +1288,7 @@
 
     // 公共入口：先保护数学公式 → 整体转义 HTML → 渲染 Markdown → 还原公式
     const mathStore = [];
+        // Markdown 渲染总入口：先提取保护数学公式，再整体转义+块级渲染，最后还原公式给 KaTeX
     function renderMarkdown(text) {
       mathStore.length = 0;
       // 提取公式：$$...$$（独立公式，可跨行）与 $...$（行内公式，不跨行），
@@ -1284,6 +1319,7 @@
     };
 
     // 对单个已注入 DOM 的 Markdown 容器渲染公式
+        // 对已注入 DOM 的 .md-body 容器调用 KaTeX 扫描并渲染公式（加载失败则降级显示原文）
     function renderMathIn(el) {
       if (el && window.renderMathInElement) {
         try { window.renderMathInElement(el, KATEX_OPTS); } catch (e) { /* 降级：保留原文 */ }
@@ -1297,6 +1333,7 @@
     };
 
     // ---------- 备注编辑器辅助（工具栏 / Tab / 快捷键 / 实时预览） ----------
+        // 备注编辑器三态切换：编辑/分屏/预览；分屏时平滑加宽弹窗并实时渲染
     function recNoteSwitchTab(mode) {
       const ta = document.getElementById('rec-note');
       const pv = document.getElementById('rec-note-preview');
@@ -1318,11 +1355,14 @@
 
     // 输入防抖后实时刷新预览
     let recPreviewTimer = null;
+        // 输入框 oninput 防抖（90ms）触发预览刷新，避免逐字渲染卡顿
     function recNoteLivePreview() {
       clearTimeout(recPreviewTimer);
       recPreviewTimer = setTimeout(recNoteRefreshPreview, 90);
     }
 
+
+    // 把当前备注文本实时渲染进预览窗格（含公式）
     function recNoteRefreshPreview() {
       const pv = document.getElementById('rec-note-preview');
       if (pv.classList.contains('hidden')) return;
@@ -1335,11 +1375,14 @@
     let viewerCtx = null; // { mod, id, backdrop, panel, closing }
 
     // 卡片点击：跳过内部的按钮 / 下拉 / 链接等交互元素
+        // 卡片点击入口：点击卡片空白放大查看，自动跳过按钮/下拉等交互元素
     function cardClick(e, mod, id) {
       if (e.target.closest('button, select, a, input, textarea, label, option')) return;
       openRecordViewer(mod, id, e.currentTarget);
     }
 
+
+    // 构建放大查看弹窗的内容 HTML（徽章/标题/统计/Markdown 备注/遗忘轨迹）
     function buildViewerHtml(mod, rec) {
       const fc = Number(rec.forgetCount) || 1;
       const isHigh = fc >= 3;
@@ -1381,6 +1424,8 @@
       `;
     }
 
+
+    // 打开放大查看弹窗，并用 FLIP 技术从被点卡片位置平滑放大到中央
     function openRecordViewer(mod, id, cardEl) {
       if (viewerCtx) return;
       const rec = appData[mod].records.find(r => r.id === id);
@@ -1422,6 +1467,8 @@
       }));
     }
 
+
+    // 关闭放大查看弹窗，带反向缩回卡片的动画；skipAnim 用于立即切换
     function closeRecordViewer(skipAnim = false) {
       if (!viewerCtx || viewerCtx.closing) return;
       const { mod, id, backdrop, panel } = viewerCtx;
@@ -1545,6 +1592,8 @@
       });
     }
 
+
+    // 关闭自定义确认弹窗并兑现/取消对应的 Promise 结果
     function closeConfirmModal(result) {
       document.getElementById('confirmModal').classList.remove('open');
       if (confirmResolver) {
@@ -1562,11 +1611,15 @@
       renderRecords(mod);
     }
 
+
+    // 跳转到指定页并重渲染当前科目记录
     function gotoPage(mod, p) {
       pageState[mod].page = Math.max(1, p);
       renderRecords(mod);
     }
 
+
+    // 切换每页条数，重置到第一页后重渲染
     function changePageSize(mod, size) {
       pageState[mod].size = parseInt(size, 10) || 20;
       pageState[mod].page = 1;
@@ -1574,6 +1627,8 @@
       renderRecords(mod);
     }
 
+
+    // 渲染分页控件（上一页/页码/下一页 + 总数信息）
     function renderPaginationBar(mod, total, totalPages, el) {
       if (totalPages <= 1) { el.innerHTML = ''; return; }
       const ps = pageState[mod];
@@ -1721,6 +1776,8 @@
       return base;
     }
 
+
+    // 从 localStorage 读取界面偏好（视图模式/自动写盘/每页条数）
     function loadPrefs() {
       try {
         const raw = localStorage.getItem(LS_PREFS_KEY);
@@ -1737,12 +1794,16 @@
       document.getElementById('autoSyncToggle').checked = autoSyncEnabled;
     }
 
+
+    // 把当前界面偏好持久化到 localStorage
     function savePrefs() {
       try {
         localStorage.setItem(LS_PREFS_KEY, JSON.stringify({ viewModes, autoSyncEnabled, pageSizes: { math: pageState.math.size, '408': pageState['408'].size } }));
       } catch {}
     }
 
+
+    // 切换“有未保存修改”状态，控制顶部黄点与按钮文字
     function setDirtyState(dirty) {
       isDirty = dirty;
       const dot = document.getElementById('dirtyDot');
@@ -1756,6 +1817,8 @@
       }
     }
 
+
+    // 根据是否已绑定本地 JSON 文件，更新顶部同步状态徽章与相关按钮显隐
     function updateSyncUI() {
       const badge = document.getElementById('syncBadge');
       const dot = document.getElementById('syncDot');
@@ -1784,6 +1847,8 @@
       }
     }
 
+
+    // 把当前数据写入用户绑定的本地 JSON 文件
     async function writeToBoundFile() {
       if (!fileHandle) return false;
       try {
@@ -1870,6 +1935,8 @@
       }
     }
 
+
+    // 开启/关闭“自动写盘”（每次修改同步写入本地 JSON）
     function toggleAutoSync(checked) {
       autoSyncEnabled = checked;
       savePrefs();
@@ -1947,6 +2014,8 @@
       }
     }
 
+
+    // 处理用户选择的 JSON 文件导入：解析、规范化数据并替换当前数据
     function handleImportFile(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -1967,6 +2036,8 @@
       event.target.value = '';
     }
 
+
+    // 导出当前全量数据为 JSON 文件下载
     function exportJson() {
       appData.updatedAt = new Date().toISOString();
       appData.version = 4;
@@ -2012,10 +2083,14 @@
       document.getElementById('snapshotModal').classList.add('open');
     }
 
+
+    // 关闭历史快照弹窗
     function closeSnapshotModal() {
       document.getElementById('snapshotModal').classList.remove('open');
     }
 
+
+    // 将某条历史快照的数据恢复到当前库（覆盖前需确认）
     async function restoreSnapshot(snapId) {
       const list = await idbGetAllSnapshots();
       const target = list.find(s => s.id === snapId);
@@ -2037,6 +2112,8 @@
       showToast('已成功恢复至所选历史快照！', 'success');
     }
 
+
+    // 将指定历史快照导出为单独的 JSON 文件
     async function exportSnapshot(snapId) {
       const list = await idbGetAllSnapshots();
       const target = list.find(s => s.id === snapId);
@@ -2054,6 +2131,7 @@
     // =========================================================================
     // 6. 标签页切换与视图模式切换
     // =========================================================================
+        // 切换四大标签页（数学/408/待办/套卷），同步按钮高亮与视图显示
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(btn => {
         const active = btn.dataset.tab === tab;
@@ -2074,6 +2152,8 @@
       });
     }
 
+
+    // 切换记录视图模式（大卡片/紧凑表格）并持久化偏好
     function setViewMode(mod, mode) {
       viewModes[mod] = mode;
       savePrefs();
@@ -2081,6 +2161,8 @@
       renderRecords(mod);
     }
 
+
+    // 同步“卡片/表格”视图切换按钮的选中态样式
     function updateViewModeButtons(mod) {
       const cardBtn = document.getElementById(`viewBtn-${mod}-card`);
       const tableBtn = document.getElementById(`viewBtn-${mod}-table`);
@@ -2090,6 +2172,8 @@
       tableBtn.className = `btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${!isCard ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`;
     }
 
+
+    // 刷新四个标签页上的记录数量徽章
     function updateTabCounts() {
       document.getElementById('tabCount-math').textContent = appData.math.records.length;
       document.getElementById('tabCount-408').textContent = appData['408'].records.length;
@@ -2108,6 +2192,8 @@
       if (appData[mod].subjects.includes(prev)) sel.value = prev;
     }
 
+
+    // 渲染数学/408 页顶部四个统计卡片（总数/未掌握/遗忘次数/高频遗忘）
     function renderStats(mod) {
       const list = appData[mod].records;
       const total = list.length;
@@ -2133,6 +2219,8 @@
       `).join('');
     }
 
+
+    // 按科目/状态/关键词筛选并排序记录，返回当前页数据源
     function getFilteredRecords(mod) {
       const subjectVal = document.getElementById(`filter-subject-${mod}`).value;
       const statusVal = document.getElementById(`filter-status-${mod}`).value;
@@ -2165,6 +2253,8 @@
       return list;
     }
 
+
+    // 渲染数学/408 记录区：统计卡 + 卡片或表格视图 + 分页
     function renderRecords(mod, popRecordId = null) {
       renderStats(mod);
       updateViewModeButtons(mod);
@@ -2343,6 +2433,8 @@
       renderMathIn(container);
     }
 
+
+    // 遗忘次数 +1，记录本次遗忘时间到 forgetEvents 并重渲染
     async function incrementForget(mod, id) {
       const rec = appData[mod].records.find(r => r.id === id);
       if (!rec) return;
@@ -2356,6 +2448,8 @@
       showToast(`「${rec.topic}」遗忘次数 +1（当前 ${rec.forgetCount} 次）`, 'info');
     }
 
+
+    // 修改记录状态（待解决/复习中/已掌握）
     async function changeRecordStatus(mod, id, newStatus) {
       const rec = appData[mod].records.find(r => r.id === id);
       if (!rec) return;
@@ -2364,6 +2458,8 @@
       renderRecords(mod);
     }
 
+
+    // 删除一条薄弱点记录（删除前自动建快照，可找回）
     async function deleteRecord(mod, id) {
       const rec = appData[mod].records.find(r => r.id === id);
       if (!rec) return;
@@ -2382,6 +2478,8 @@
       showToast('已删除记录（可通过历史快照恢复）', 'info');
     }
 
+
+    // 把一条薄弱点记录推送到每日待办
     async function pushRecordToTodo(mod, id) {
       const rec = appData[mod].records.find(r => r.id === id);
       if (!rec) return;
@@ -2401,6 +2499,8 @@
       showToast(`已将「${rec.topic}」加入今日待办`, 'success');
     }
 
+
+    // 打开“新增/编辑薄弱点”弹窗并回填字段
     function openRecordModal(mod, id = '') {
       document.getElementById('rec-module').value = mod;
       document.getElementById('rec-id').value = id;
@@ -2437,10 +2537,14 @@
       setTimeout(() => document.getElementById('rec-topic').focus(), 100);
     }
 
+
+    // 关闭薄弱点编辑弹窗
     function closeRecordModal() {
       document.getElementById('recordModal').classList.remove('open');
     }
 
+
+    // 保存薄弱点编辑弹窗的表单数据（新增或更新）
     async function saveRecordModal() {
       const mod = document.getElementById('rec-module').value;
       const id = document.getElementById('rec-id').value;
@@ -2500,6 +2604,8 @@
       renderTodos();
     }
 
+
+    // 清空待办页的所有筛选条件
     function clearTodoFilters() {
       document.getElementById('filter-todo-status').value = 'all';
       document.getElementById('filter-todo-cat').value = '';
@@ -2508,6 +2614,8 @@
       renderTodos();
     }
 
+
+    // 快速添加一条待办（来自顶部输入栏）
     async function quickAddTodo() {
       const titleEl = document.getElementById('quick-todo-title');
       const title = titleEl.value.trim();
@@ -2535,6 +2643,8 @@
       showToast('已添加待办事项', 'success');
     }
 
+
+    // 切换某条待办的完成状态
     async function toggleTodoComplete(id) {
       const todo = appData.todos.find(t => t.id === id);
       if (!todo) return;
@@ -2543,6 +2653,8 @@
       renderTodos(id);
     }
 
+
+    // 顺延待办：在自身日期上加一天
     async function postponeTodoToTomorrow(id) {
       const todo = appData.todos.find(t => t.id === id);
       if (!todo) return;
@@ -2553,6 +2665,8 @@
       showToast(`已顺延至 ${isoToSlash(todo.dateStr)}`, 'info');
     }
 
+
+    // 删除一条待办
     async function deleteTodo(id) {
       await createSnapshot('删除待办前备份');
       appData.todos = appData.todos.filter(t => t.id !== id);
@@ -2561,6 +2675,8 @@
       showToast('已删除待办（可在历史快照中找回）', 'info');
     }
 
+
+    // 打开待办编辑弹窗并回填字段
     function openTodoModal(id) {
       const todo = appData.todos.find(t => t.id === id);
       if (!todo) return;
@@ -2574,10 +2690,14 @@
       document.getElementById('todoModal').classList.add('open');
     }
 
+
+    // 关闭待办编辑弹窗
     function closeTodoModal() {
       document.getElementById('todoModal').classList.remove('open');
     }
 
+
+    // 保存待办编辑弹窗的修改
     async function saveTodoModal() {
       const id = document.getElementById('edit-todo-id').value;
       const title = document.getElementById('edit-todo-title').value.trim();
@@ -2600,6 +2720,8 @@
       showToast('已保存待办修改', 'success');
     }
 
+
+    // 渲染待办页顶部四个统计卡片
     function renderTodoStats() {
       const today = todayISO();
       const all = appData.todos;
@@ -2627,8 +2749,102 @@
       `).join('');
     }
 
+    // 月度待办热力图：每格 = 一天，颜色深浅表示当天待办数量
+    function shiftHeatmapMonth(delta) {
+      const base = heatmapYM || todayISO().slice(0, 7);
+      const [y, m] = base.split('-').map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      heatmapYM = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      renderTodoHeatmap();
+    }
+
+
+    // 渲染月度待办热力图：按日期统计待办数量，颜色深浅表示忙闲
+    function renderTodoHeatmap() {
+      const el = document.getElementById('todo-heatmap');
+      if (!el) return;
+      const ym = heatmapYM || todayISO().slice(0, 7);
+      const [year, month] = ym.split('-').map(Number);
+      const firstDay = new Date(year, month - 1, 1);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const startWeekday = (firstDay.getDay() + 6) % 7; // 周一=0 ... 周日=6
+      const weekNames = ['一', '二', '三', '四', '五', '六', '日'];
+      const today = todayISO();
+
+      // 按日期统计待办数量（含已完成/未完成）
+      const counts = {};
+      appData.todos.forEach(t => {
+        const iso = slashToIso(t.dateStr || today);
+        counts[iso] = (counts[iso] || 0) + 1;
+      });
+
+      // 颜色分档：0 浅灰 → 1~2 → 3~4 → 5~6 → 7+ 深蓝
+      const levelOf = n => n === 0 ? 0 : n <= 2 ? 1 : n <= 4 ? 2 : n <= 6 ? 3 : 4;
+      const cellColors = [
+        'bg-slate-100/80 border-slate-200/70 text-slate-400',
+        'bg-blue-100 border-blue-200 text-blue-700',
+        'bg-blue-200 border-blue-300 text-blue-800',
+        'bg-blue-400 border-blue-500 text-white',
+        'bg-blue-600 border-blue-700 text-white'
+      ];
+
+      // 先汇总整月统计，再生成格子（避免 tooltip 里的“最多一天”标记错位）
+      let monthTotal = 0, activeDays = 0, maxCount = 0, maxDay = 0;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const n = counts[`${ym}-${String(d).padStart(2, '0')}`] || 0;
+        monthTotal += n;
+        if (n > 0) activeDays++;
+        if (n > maxCount) { maxCount = n; maxDay = d; }
+      }
+
+      const cells = [];
+      for (let i = 0; i < startWeekday; i++) cells.push('<div></div>'); // 月初占位
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = `${ym}-${String(d).padStart(2, '0')}`;
+        const n = counts[iso] || 0;
+        const lv = levelOf(n);
+        const isToday = iso === today;
+        const dow = (startWeekday + d - 1) % 7;
+        cells.push(`
+          <div class="relative aspect-square rounded-lg border flex flex-col items-center justify-center cursor-default transition-transform hover:scale-110 hover:z-10 shadow-xs ${cellColors[lv]} ${dow >= 5 ? 'opacity-90' : ''} ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}"
+            title="${month}月${d}日：${n} 条待办${n > 0 && d === maxDay ? ' · 本月最多' : ''}">
+            <span class="text-xs sm:text-sm font-semibold leading-none">${d}</span>
+            ${n ? `<span class="text-[9px] sm:text-[10px] font-bold leading-none mt-1">${n}条</span>` : ''}
+          </div>`);
+      }
+
+      const isCurrentMonth = ym === today.slice(0, 7);
+      el.innerHTML = `
+        <div class="bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-sm sm:text-base font-bold text-slate-800">🗓️ 待办热力图 <span class="text-xs font-normal text-slate-400">· 格子颜色越深，当天待办越多</span></h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">本月共 <b class="text-blue-600">${monthTotal}</b> 条 · 有安排 <b class="text-emerald-600">${activeDays}</b> 天${maxCount ? ` · 最多 ${month}月${maxDay}日（${maxCount} 条）` : ''}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="shiftHeatmapMonth(-1)" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-slate-200" title="上个月">‹</button>
+              <span class="min-w-[92px] text-center text-sm font-bold text-slate-700 tabular-nums">${year}年${month}月</span>
+              <button onclick="shiftHeatmapMonth(1)" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-slate-200 ${isCurrentMonth ? 'opacity-40' : ''}" title="下个月">›</button>
+              ${!isCurrentMonth ? `<button onclick="heatmapYM='';renderTodoHeatmap()" class="btn-tactile px-2.5 h-8 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100">回到本月</button>` : ''}
+            </div>
+          </div>
+          <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
+            ${weekNames.map(w => `<div class="text-center text-[11px] font-semibold text-slate-400 pb-1">${w}</div>`).join('')}
+            ${cells.join('')}
+          </div>
+          <div class="flex items-center justify-end gap-1.5 mt-3 text-[11px] text-slate-400">
+            <span>少</span>
+            ${cellColors.map(c => `<span class="w-3.5 h-3.5 rounded border ${c}"></span>`).join('')}
+            <span>多</span>
+          </div>
+        </div>`;
+    }
+
+
+    // 渲染待办页：统计卡 + 热力图 + 按日期分组的待办列表
     function renderTodos(popTodoId = null) {
       renderTodoStats();
+      renderTodoHeatmap();
       const statusFilter = document.getElementById('filter-todo-status').value;
       const catFilter = document.getElementById('filter-todo-cat').value;
       const dateFilter = document.getElementById('filter-todo-date').value;
@@ -2765,6 +2981,8 @@
       return (p.smallScore || 0) + (p.bigScore || 0);
     }
 
+
+    // 根据现有套卷的分类动态填充“系列”筛选下拉框
     function populatePaperCatFilter() {
       const sel = document.getElementById('filter-paper-cat');
       const prev = sel.value;
@@ -2774,6 +2992,8 @@
       if (cats.includes(prev)) sel.value = prev;
     }
 
+
+    // 渲染套卷页顶部四个统计卡片
     function renderPaperStats() {
       const list = appData.papers;
       const mathCount = list.filter(p => p.mod === 'math').length;
@@ -2796,6 +3016,87 @@
       `).join('');
     }
 
+    // 平均分统计图表：数学/408 × 真题/模拟卷，柱形展示各套分数与平均分
+        // 渲染平均分图表：数学/408 × 真题/模拟卷分组，柱形显示各卷得分与均分线
+    function renderScoreChart() {
+      const el = document.getElementById('score-chart');
+      if (!el) return;
+      const groups = [
+        { mod: 'math', cat: '真题', label: '数学 · 真题', icon: '📐', tone: 'blue' },
+        { mod: 'math', cat: '模拟卷', label: '数学 · 模拟卷', icon: '📘', tone: 'cyan' },
+        { mod: '408', cat: '真题', label: '408 · 真题', icon: '💻', tone: 'violet' },
+        { mod: '408', cat: '模拟卷', label: '408 · 模拟卷', icon: '🧪', tone: 'purple' }
+      ];
+      const theme = {
+        blue:   { bar: 'bg-blue-500',   avg: 'bg-blue-600',   text: 'text-blue-600',   badge: 'bg-blue-50 text-blue-700',   line: 'border-blue-400' },
+        cyan:   { bar: 'bg-cyan-500',   avg: 'bg-cyan-600',   text: 'text-cyan-600',   badge: 'bg-cyan-50 text-cyan-700',   line: 'border-cyan-400' },
+        violet: { bar: 'bg-violet-500', avg: 'bg-violet-600', text: 'text-violet-600', badge: 'bg-violet-50 text-violet-700', line: 'border-violet-400' },
+        purple: { bar: 'bg-purple-500', avg: 'bg-purple-600', text: 'text-purple-600', badge: 'bg-purple-50 text-purple-700', line: 'border-purple-400' }
+      };
+      const scored = p => p.smallScore !== null || p.bigScore !== null; // 仅统计填了分数的卷
+      const MAX = 150; // 数学 / 408 满分均为 150
+
+      const panels = groups.map(g => {
+        const t = theme[g.tone];
+        const list = appData.papers
+          .filter(p => p.mod === g.mod && p.category === g.cat && scored(p))
+          .sort((a, b) => slashToIso(a.dateStr).localeCompare(slashToIso(b.dateStr)));
+        const scores = list.map(paperTotal);
+        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        const avgPct = Math.max(0, Math.min(100, avg / MAX * 100));
+        const hi = scores.length ? Math.max(...scores) : 0;
+        const lo = scores.length ? Math.min(...scores) : 0;
+        // 每套卷一根细柱 + 平均分横向虚线
+        const bars = scores.map(s => `
+          <div class="relative flex-1 h-full flex items-end justify-center group" title="${escapeHtml(list[scores.indexOf(s)].name)}：${s} 分（${escapeHtml(list[scores.indexOf(s)].dateStr)}）">
+            <div class="w-full max-w-[14px] rounded-t-md ${t.bar} opacity-60 group-hover:opacity-100 transition-opacity" style="height:${Math.max(2, Math.min(100, s / MAX * 100))}%"></div>
+          </div>`).join('');
+        return `
+          <div class="bg-white/95 backdrop-blur border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">${g.icon}</span>
+                <span class="text-sm font-bold text-slate-800">${g.label}</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${t.badge}">${list.length} 套</span>
+            </div>
+            <div class="flex items-end gap-2 mb-3">
+              <span class="text-3xl font-extrabold ${t.text} tabular-nums leading-none">${scores.length ? avg.toFixed(1) : '—'}</span>
+              <span class="text-xs text-slate-400 mb-0.5">平均分</span>
+              ${scores.length ? `<span class="ml-auto text-[11px] text-slate-400 mb-0.5">最高 ${hi} · 最低 ${lo}</span>` : ''}
+            </div>
+            <div class="relative h-28 bg-slate-50/90 border border-slate-100 rounded-xl overflow-hidden px-2 pt-2">
+              <!-- 满分参考网格线 -->
+              <div class="absolute inset-x-0 bottom-1/3 border-t border-dashed border-slate-200"></div>
+              <div class="absolute inset-x-0 bottom-[66.6%] border-t border-dashed border-slate-200"></div>
+              <div class="flex items-end gap-1 h-full">
+                ${scores.length ? bars : '<div class="w-full self-center text-center text-xs text-slate-400 py-8">暂无带分数的套卷</div>'}
+              </div>
+              ${scores.length ? `<div class="absolute inset-x-2 border-t-2 border-dashed ${t.line} pointer-events-none" style="bottom:calc(8px + (100% - 8px) * ${avgPct / 100})">
+                <span class="absolute -top-4 right-0 text-[10px] font-bold ${t.text}">均分线</span>
+              </div>` : ''}
+            </div>
+            <div class="flex items-center justify-between mt-2 text-[10px] text-slate-400">
+              <span>满分 ${MAX}</span><span>按考试日期排列 →</span>
+            </div>
+          </div>`;
+      }).join('');
+
+      el.innerHTML = `
+        <div class="bg-white/60 backdrop-blur border border-slate-200/70 rounded-2xl p-4 sm:p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 class="text-sm sm:text-base font-bold text-slate-800">📊 套卷平均分概览</h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">真题与模拟卷分开统计 · 柱形为每次得分，虚线为平均分（满分 150）</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-500">共 ${appData.papers.length} 套记录</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">${panels}</div>
+        </div>`;
+    }
+
+
+    // 按科目/分类/关键词筛选并排序套卷
     function getFilteredPapers() {
       const modVal = document.getElementById('filter-paper-mod').value;
       const catVal = document.getElementById('filter-paper-cat').value;
@@ -2821,6 +3122,8 @@
       return list;
     }
 
+
+    // 生成单张套卷卡片的 HTML（分数/用时/错误题列表）
     function paperCardHtml(p, idx) {
       const modBadge = p.mod === 'math'
         ? 'bg-blue-50 text-blue-700 border-blue-100'
@@ -2881,9 +3184,12 @@
         </article>`;
     }
 
+
+    // 渲染套卷页：统计卡 + 平均分图表 + 筛选后的套卷列表
     function renderPapers() {
       populatePaperCatFilter();
       renderPaperStats();
+      renderScoreChart();
       const list = getFilteredPapers();
       const container = document.getElementById('papers-container');
       if (!list.length) {
@@ -2898,6 +3204,8 @@
       container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${list.map((p, idx) => paperCardHtml(p, idx)).join('')}</div>`;
     }
 
+
+    // 打开“新增/编辑套卷”弹窗
     function openPaperModal(id = '') {
       document.getElementById('paper-id').value = id;
       const modSel = document.getElementById('paper-mod');
@@ -2931,14 +3239,20 @@
       setTimeout(() => document.getElementById('paper-name').focus(), 100);
     }
 
+
+    // 关闭套卷编辑弹窗
     function closePaperModal() {
       document.getElementById('paperModal').classList.remove('open');
     }
 
+
+    // 套卷科目切换时的联动处理
     function onPaperModChange() {
       renderPaperErrorRows();
     }
 
+
+    // 渲染套卷弹窗内的错误题编辑行
     function renderPaperErrorRows() {
       const mod = document.getElementById('paper-mod').value;
       const subjects = appData[mod].subjects;
@@ -2963,21 +3277,29 @@
       }).join('');
     }
 
+
+    // 在套卷弹窗中新增一行错误题输入
     function addPaperErrorRow() {
       paperDraftErrors.push({ id: genId('err'), qno: '', point: '', sub: '', addedToTracker: false });
       renderPaperErrorRows();
     }
 
+
+    // 删除套卷弹窗中的一行错误题
     function removePaperErrorRow(id) {
       paperDraftErrors = paperDraftErrors.filter(e => e.id !== id);
       renderPaperErrorRows();
     }
 
+
+    // 更新套卷弹窗草稿中某个字段的值
     function updatePaperDraft(id, field, val) {
       const e = paperDraftErrors.find(x => x.id === id);
       if (e) e[field] = val;
     }
 
+
+    // 保存套卷弹窗的表单（含错误题）到数据
     async function savePaperModal() {
       const id = document.getElementById('paper-id').value;
       const name = document.getElementById('paper-name').value.trim();
@@ -3017,6 +3339,8 @@
       showToast(id ? '已更新套卷' : '已添加套卷', 'success');
     }
 
+
+    // 删除一套卷记录
     async function deletePaper(id) {
       const p = appData.papers.find(x => x.id === id);
       if (!p) return;
@@ -3035,6 +3359,8 @@
       showToast('已删除套卷（可通过历史快照恢复）', 'info');
     }
 
+
+    // 将套卷中的某道错误题一键加入薄弱点遗忘追踪
     async function pushErrorToTracker(paperId, errId) {
       const paper = appData.papers.find(p => p.id === paperId);
       if (!paper) return;
@@ -3066,6 +3392,8 @@
       showToast(`已将「${topic}」加入${mod === 'math' ? '数学' : '408'}遗忘点`, 'success');
     }
 
+
+    // 全量重渲染：四个标签页的记录/统计/图表一次刷新
     function renderAll() {
       populateSubjectFilter('math');
       populateSubjectFilter('408');
@@ -3103,6 +3431,7 @@
     // =========================================================================
     // 10. 启动初始化流程
     // =========================================================================
+        // 应用启动入口：建库 → 加载数据 → 恢复文件句柄 → 首次全量渲染
     async function initApp() {
       loadPrefs();
       document.getElementById('quick-todo-date').value = todayISO();
