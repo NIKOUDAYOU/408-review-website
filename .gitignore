@@ -15,6 +15,9 @@ _pushwork/
 # 工具缓存与运行时备份
 .workbuddy/
 backup/
-# 桌宠源码（非本网站文件）
-zhuochong版本/# 个人数据（不入库）
+# 桌宠源码与历史单文件备份（非本仓库运行文件）
+zhuochong版本/
+版本说明/408_v4.html
+
+# 个人数据（不入库）
 shiyiyue_zhishidian2.json
