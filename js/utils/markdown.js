@@ -3,10 +3,10 @@
 
 // ===================== Markdown 渲染（备注 / 反思专用） =====================
 // 行内语法：输入已 escapeHtml，输出安全 HTML
-    // Markdown 行内语法解析（加粗/斜体/删除线/代码/链接），输入为已转义文本
+// Markdown 行内语法解析（加粗/斜体/删除线/高亮/行内代码占位/链接），输入为已转义文本
 function mdInline(s) {
   return s
-    .replace(/`([^`]+)`/g, '<code class="md-code">$1</code>')
+    .replace(/==([^=\n]+)==/g, '<mark class="md-mark">$1</mark>')
     .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*\n])\*([^*\n]+)\*/g, '$1<em>$2</em>')
@@ -17,9 +17,18 @@ function mdInline(s) {
     });
 }
 
-// 块级解析：标题 / 列表 / 引用 / 代码块 / 表格 / 分隔线 / 段落（单换行 → <br>）
-    // Markdown 块级解析主循环：标题/列表/引用/代码块/表格/分隔线/段落
-function mdRender(src) {
+// 提示框 / 避坑框映射
+const MD_CALLOUT_MAP = {
+  TIP: { cls: 'tip', icon: '💡', title: '思路提示' },
+  WARN: { cls: 'warn', icon: '⚠️', title: '易错避坑' },
+  WARNING: { cls: 'warn', icon: '⚠️', title: '易错避坑' },
+  PITFALL: { cls: 'warn', icon: '⚠️', title: '易错避坑' },
+  KEY: { cls: 'key', icon: '📌', title: '核心结论' },
+  NOTE: { cls: 'note', icon: '📝', title: '补充说明' }
+};
+
+// 块级解析：标题 / 列表(含任务清单) / 引用(含提示框) / 代码块占位 / 独立公式占位 / 表格 / 分隔线 / 段落
+function mdRender(src, mathStoreRef = []) {
   const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   const listStack = [];
@@ -31,11 +40,31 @@ function mdRender(src) {
     }
   };
   const splitRow = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+  const isStandaloneCodeBlock = (ln) => /^\s*⟦CB\d+⟧\s*$/.test(ln);
+  const isStandaloneDisplayMath = (ln) => {
+    const m = ln.trim().match(/^⟦M(\d+)⟧$/);
+    return Boolean(m && mathStoreRef[+m[1]] && mathStoreRef[+m[1]].display);
+  };
+
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
 
-    // 围栏代码块 ```
+    // 独立代码块占位符 ⟦CBn⟧
+    if (isStandaloneCodeBlock(line)) {
+      closeLists();
+      out.push(line.trim());
+      i++;
+      continue;
+    }
+    // 独立公式块占位符 ⟦Mn⟧（display: true）
+    if (isStandaloneDisplayMath(line)) {
+      closeLists();
+      out.push(`<div class="md-math-block">${line.trim()}</div>`);
+      i++;
+      continue;
+    }
+    // 兼容未闭合的围栏代码块 ```
     if (/^\s*```/.test(line)) {
       closeLists();
       const buf = [];
@@ -57,7 +86,7 @@ function mdRender(src) {
     }
     // 分隔线 --- / *** / ___
     if (/^\s*([-*_])\s*(\1\s*){2,}$/.test(line)) { closeLists(); out.push('<hr class="md-hr">'); i++; continue; }
-    // 引用 >
+    // 引用 > （支持 > [!TIP] / > [!WARN] / > [!KEY] / > [!NOTE]）
     if (/^\s*&gt;/.test(line)) {
       closeLists();
       const buf = [];
@@ -65,7 +94,21 @@ function mdRender(src) {
         buf.push(lines[i].replace(/^\s*&gt;\s?/, ''));
         i++;
       }
-      out.push(`<blockquote class="md-quote"><p class="md-p">${buf.map(mdInline).join('<br>')}</p></blockquote>`);
+      const calloutMatch = buf[0] && buf[0].match(/^\[!(TIP|WARN|WARNING|KEY|NOTE|PITFALL)\](?:\s+(.*))?$/i);
+      if (calloutMatch) {
+        const meta = MD_CALLOUT_MAP[calloutMatch[1].toUpperCase()] || MD_CALLOUT_MAP.NOTE;
+        const customTitle = (calloutMatch[2] || '').trim();
+        const titleHtml = customTitle ? mdInline(customTitle) : meta.title;
+        const bodyLines = buf.slice(1);
+        out.push(
+          `<blockquote class="md-quote md-callout md-callout-${meta.cls}">` +
+            `<div class="md-callout-title">${meta.icon} ${titleHtml}</div>` +
+            (bodyLines.length ? `<p class="md-p">${bodyLines.map(mdInline).join('<br>')}</p>` : '') +
+          `</blockquote>`
+        );
+      } else {
+        out.push(`<blockquote class="md-quote"><p class="md-p">${buf.map(mdInline).join('<br>')}</p></blockquote>`);
+      }
       continue;
     }
     // 表格（当前行含 |，下一行为 |:---:| 形式分隔行）
@@ -84,7 +127,7 @@ function mdRender(src) {
         }</tbody></table>`);
       continue;
     }
-    // 列表项（2 空格 = 一层嵌套，嵌套列表包在父级 <li> 内）
+    // 列表项（2 空格 = 一层嵌套，支持任务清单 - [ ] / - [x]）
     const li = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.+)$/);
     if (li) {
       const level = Math.floor(li[1].replace(/\t/g, '  ').length / 2);
@@ -98,7 +141,13 @@ function mdRender(src) {
         liOpenStack.push(false);
       }
       if (liOpenStack[liOpenStack.length - 1]) out.push('</li>'); // 同级新条目：闭合上一条
-      out.push(`<li>${mdInline(li[3])}`);
+      const task = li[3].match(/^\[([ xX])\]\s+(.+)$/);
+      if (task) {
+        const checked = task[1].toLowerCase() === 'x';
+        out.push(`<li class="md-task ${checked ? 'md-task-done' : ''}"><span class="md-task-box" aria-hidden="true">${checked ? '✓' : ''}</span><span class="md-task-text">${mdInline(task[2])}</span>`);
+      } else {
+        out.push(`<li>${mdInline(li[3])}`);
+      }
       liOpenStack[liOpenStack.length - 1] = true;
       i++; continue;
     }
@@ -107,6 +156,8 @@ function mdRender(src) {
     const buf = [line];
     i++;
     while (i < lines.length && lines[i].trim() &&
+      !isStandaloneCodeBlock(lines[i]) &&
+      !isStandaloneDisplayMath(lines[i]) &&
       !/^\s*(#{1,6}\s|```|&gt;|([-*+]|\d+[.)])\s)/.test(lines[i]) &&
       !/^\s*([-*_])\s*(\1\s*){2,}$/.test(lines[i])) {
       buf.push(lines[i]); i++;
@@ -117,44 +168,97 @@ function mdRender(src) {
   return out.join('');
 }
 
-// 公共入口：先保护数学公式 → 整体转义 HTML → 渲染 Markdown → 还原公式
+// 公共入口：先保护代码（避免代码中 $ 被误伤）→ 保护 \$ 与公式 → 整体转义 HTML → 渲染 Markdown → 还原公式与代码
 const mathStore = [];
-    // Markdown 渲染总入口：先提取保护数学公式，再整体转义+块级渲染，最后还原公式给 KaTeX
 function renderMarkdown(text) {
   mathStore.length = 0;
-  // 提取公式：$$...$$（独立公式，可跨行）与 $...$（行内公式，不跨行），
-  // 用占位符顶替，避免 TeX 里的 * _ | 等符号被 Markdown 语法误伤
-  const masked = String(text || '')
+  const codeBlocks = [];
+  const inlineCodes = [];
+
+  let masked = String(text || '').replace(/\r\n?/g, '\n');
+
+  // 1. 提取围栏代码块 ```...```，避免内部 $ / ** / # 被误解析
+  masked = masked.replace(/^[ \t]*```[^\n]*\n([\s\S]*?)^[ \t]*```[ \t]*$/gm, (m, code) => {
+    codeBlocks.push(code.replace(/\n$/, ''));
+    return `\n⟦CB${codeBlocks.length - 1}⟧\n`;
+  });
+
+  // 2. 提取行内代码 `...`
+  masked = masked.replace(/`([^`\n]+)`/g, (m, code) => {
+    inlineCodes.push(code);
+    return `⟦IC${inlineCodes.length - 1}⟧`;
+  });
+
+  // 3. 保护转义美元符号 \$
+  masked = masked.replace(/\\\$/g, '⟦DOLLAR⟧');
+
+  // 4. 提取公式：$$...$$ / \[...\]（块级，可跨行）与 $...$ / \(...\)（行内，不跨行）
+  masked = masked
     .replace(/\$\$([\s\S]+?)\$\$/g, m => { mathStore.push({ tex: m, display: true }); return `⟦M${mathStore.length - 1}⟧`; })
-    .replace(/\$([^\$\n]+?)\$/g, m => { mathStore.push({ tex: m, display: false }); return `⟦M${mathStore.length - 1}⟧`; });
+    .replace(/\\\[([\s\S]+?)\\\]/g, m => { mathStore.push({ tex: m, display: true }); return `⟦M${mathStore.length - 1}⟧`; })
+    .replace(/\$([^\$\n]+?)\$/g, m => { mathStore.push({ tex: m, display: false }); return `⟦M${mathStore.length - 1}⟧`; })
+    .replace(/\\\(([^\n]+?)\\\)/g, m => { mathStore.push({ tex: m, display: false }); return `⟦M${mathStore.length - 1}⟧`; });
+
   const escaped = escapeHtml(masked).trim();
   if (!escaped) return '';
-  const html = mdRender(escaped);
-  // 还原公式原文（含 $ 分隔符），交给 KaTeX auto-render 扫描渲染
-  return html.replace(/⟦M(\d+)⟧/g, (m, idx) => {
-    const item = mathStore[+idx];
-    if (!item) return '';
-    const esc = escapeHtml(item.tex);
-    return item.display ? `<span class="md-math-display">${esc}</span>` : esc;
-  });
+  const html = mdRender(escaped, mathStore);
+
+  // 5. 还原公式、行内代码、代码块与字面美元符号
+  return html
+    .replace(/⟦M(\d+)⟧/g, (m, idx) => {
+      const item = mathStore[+idx];
+      if (!item) return '';
+      const esc = escapeHtml(item.tex);
+      return item.display ? `<span class="md-math-display">${esc}</span>` : esc;
+    })
+    .replace(/⟦IC(\d+)⟧/g, (m, idx) => `<code class="md-code">${escapeHtml(inlineCodes[+idx] || '')}</code>`)
+    .replace(/⟦CB(\d+)⟧/g, (m, idx) => `<pre class="md-pre"><code>${escapeHtml(codeBlocks[+idx] || '')}</code></pre>`)
+    .replace(/⟦DOLLAR⟧/g, '<span class="md-dollar">$</span>');
 }
 
 // KaTeX 扫描选项
 const KATEX_OPTS = {
   delimiters: [
     { left: '$$', right: '$$', display: true },
-    { left: '$', right: '$', display: false }
+    { left: '\\[', right: '\\]', display: true },
+    { left: '$', right: '$', display: false },
+    { left: '\\(', right: '\\)', display: false }
   ],
   ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
   throwOnError: false
 };
 
 // 对单个已注入 DOM 的 Markdown 容器渲染公式
-    // 对已注入 DOM 的 .md-body 容器调用 KaTeX 扫描并渲染公式（加载失败则降级显示原文）
 function renderMathIn(el) {
   if (el && window.renderMathInElement) {
     try { window.renderMathInElement(el, KATEX_OPTS); } catch (e) { /* 降级：保留原文 */ }
   }
+}
+
+// 直接将一段 LaTeX 渲染到预览容器（供公式编辑器 / 矩阵生成器 / 符号速查使用）
+function renderTexToEl(el, tex, displayMode = true) {
+  if (!el) return { ok: false, error: 'missing target' };
+  const raw = String(tex || '').trim();
+  if (!raw) {
+    el.innerHTML = '<span class="text-xs text-slate-400 italic">（输入或点击上方模板，此处实时渲染预览）</span>';
+    return { ok: true, empty: true };
+  }
+  if (window.katex && typeof window.katex.render === 'function') {
+    try {
+      window.katex.render(raw, el, { displayMode, throwOnError: true, strict: 'ignore' });
+      return { ok: true };
+    } catch (err) {
+      // 语法未输完时用 throwOnError:false 做温和渲染，并返回错误提示
+      try {
+        window.katex.render(raw, el, { displayMode, throwOnError: false, strict: 'ignore' });
+      } catch (_) {
+        el.textContent = raw;
+      }
+      return { ok: false, error: err && err.message ? err.message : '公式语法尚未完整' };
+    }
+  }
+  el.textContent = displayMode ? `$$${raw}$$` : `$${raw}$`;
+  return { ok: true, fallback: true };
 }
 
 // KaTeX 加载完成后全量补渲染（处理脚本先于 KaTeX 就绪渲染的内容）

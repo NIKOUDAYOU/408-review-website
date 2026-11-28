@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- 主背景：与页面顶栏一致的蓝-靛-紫渐变 -->
+    <linearGradient id="bg" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="48%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+
+    <!-- 左上角柔光，增强暗色标签页下的立体感 -->
+    <radialGradient id="topGlow" cx="16" cy="12" r="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 右上角星芒微光 -->
+    <radialGradient id="sparkGlow" cx="48" cy="17" r="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.4"/>
+      <stop offset="60%" stop-color="#c4b5fd" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 中心曲线柔和背光 -->
+    <radialGradient id="curveGlow" cx="30" cy="36" r="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#4f46e5" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 细微高光描边（暗色/浅色标签页均清晰锐利） -->
+    <linearGradient id="rim" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.42"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.24"/>
+    </linearGradient>
+
+    <!-- 上升记忆曲线渐变 -->
+    <linearGradient id="lineGrad" x1="12" y1="48" x2="43" y2="25" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="45%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+
+    <!-- 突破星芒渐变（暖金白，与蓝紫底高对比） -->
+    <linearGradient id="starGrad" x1="41" y1="9" x2="55" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="38%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+
+    <clipPath id="cardClip">
+      <rect x="2" y="2" width="60" height="60" rx="16"/>
+    </clipPath>
+  </defs>
+
+  <!-- 蓝紫渐变圆角底 -->
+  <g clip-path="url(#cardClip)">
+    <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#bg)"/>
+    <rect x="2" y="2" width="60" height="60" fill="url(#topGlow)"/>
+    <rect x="2" y="2" width="60" height="60" fill="url(#curveGlow)"/>
+    <rect x="2" y="2" width="60" height="60" fill="url(#sparkGlow)"/>
+  </g>
+
+  <!-- 内高光边框 -->
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="15.25"
+        fill="none" stroke="url(#rim)" stroke-width="1.5"/>
+
+  <!-- 辅助小微星（平衡左上角视觉） -->
+  <path d="M 18 13.5 Q 18.6 16.9 22 17.5 Q 18.6 18.1 18 21.5 Q 17.4 18.1 14 17.5 Q 17.4 16.9 18 13.5 Z"
+        fill="#e0f2fe" fill-opacity="0.72"/>
+
+  <!-- 上升记忆曲线阴影层（纯矢量无滤镜，全浏览器稳定） -->
+  <path d="M 12.5 49.6 L 21.9 36.5 Q 24 33.6 26.75 35.9 L 30.75 39.3 Q 33.5 41.6 35.4 38.6 L 42.4 27.5"
+        fill="none" stroke="#1e1b4b" stroke-opacity="0.24" stroke-width="6.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 上升记忆曲线主体 -->
+  <path d="M 12.5 48 L 21.9 34.9 Q 24 32 26.75 34.3 L 30.75 37.7 Q 33.5 40 35.4 37 L 42.4 25.9"
+        fill="none" stroke="url(#lineGrad)" stroke-width="6.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 主星芒阴影层 -->
+  <path d="M 48 9.4 Q 49.2 17.2 57 18.4 Q 49.2 19.6 48 27.4 Q 46.8 19.6 39 18.4 Q 46.8 17.2 48 9.4 Z"
+        fill="#1e1b4b" fill-opacity="0.22"/>
+
+  <!-- 主星芒（掌握突破点） -->
+  <path d="M 48 8 Q 49.2 15.8 57 17 Q 49.2 18.2 48 26 Q 46.8 18.2 39 17 Q 46.8 15.8 48 8 Z"
+        fill="url(#starGrad)"/>
+</svg>

@@ -21,3 +21,8 @@ zhuochong版本/
 
 # 个人数据（不入库）
 shiyiyue_zhishidian2.json
+readings_1_1126.json
+*.json
+store/
+学习情况记录/
+*.pdf

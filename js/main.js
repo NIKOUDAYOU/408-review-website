@@ -1,16 +1,19 @@
 // 全量渲染、快捷键、倒计时与启动入口
-// 由 408_v4.html 拆分而来：普通 <script> 加载（兼容 file:// 打开），函数与变量为全局共享
+// 普通 <script> 加载（兼容 file:// 打开），函数与变量为全局共享
 
 
-// 全量重渲染：四个标签页的记录/统计/图表一次刷新
+// 全量重渲染：所有标签页的记录/统计/图表一次刷新
 function renderAll() {
   populateSubjectFilter('math');
   populateSubjectFilter('408');
+  if (typeof populatePoliticsSubjectFilter === 'function') populatePoliticsSubjectFilter();
   renderRecords('math');
   renderRecords('408');
+  if (typeof renderPolitics === 'function') renderPolitics();
   renderTodos();
   renderPapers();
   renderScoreChart(); // 统计页图表
+  renderReadings();   // 英语阅读总结
   updateTabCounts();
 }
 
@@ -22,12 +25,55 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     manualSave();
   }
+  // 在英语阅读标签页（且焦点不在输入框/文本域、且未打开弹窗）支持 Ctrl+Z / Ctrl+Y 撤回与重做分段
+  if ((e.ctrlKey || e.metaKey) && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target && e.target.tagName) || '') && !document.querySelector('.modal-backdrop.open')) {
+    const readingSec = document.getElementById('view-reading');
+    if (readingSec && readingSec.classList.contains('active')) {
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey && typeof undoReadingText === 'function') {
+        e.preventDefault();
+        undoReadingText();
+      } else if ((e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)) && typeof redoReadingText === 'function') {
+        e.preventDefault();
+        redoReadingText();
+      }
+    }
+  }
   if (e.key === 'Escape') {
-    closeRecordModal();
-    closeTodoModal();
-    closePaperModal();
+    // 1. 优先关闭确认弹窗与图片全屏灯箱
+    const cm = document.getElementById('confirmModal');
+    if (cm && cm.classList.contains('open')) {
+      closeConfirmModal(false);
+      return;
+    }
+    const lb = document.getElementById('politicsLightbox');
+    if (lb && lb.classList.contains('open')) {
+      closePoliticsLightbox();
+      return;
+    }
+    const ms = document.getElementById('mathStudioModal');
+    if (ms && ms.classList.contains('open')) {
+      if (typeof closeMathStudio === 'function') closeMathStudio();
+      return;
+    }
+    // 2. 编辑类弹窗打开时，禁止按 Esc 直接退出，避免写了一大段误触丢失
+    const editorModalIds = [
+      'recordModal',
+      'politicsModal',
+      'todoModal',
+      'paperModal',
+      'readingModal',
+      'readingNoteModal',
+      'pdfImportModal'
+    ];
+    if (editorModalIds.some(id => document.getElementById(id)?.classList.contains('open'))) {
+      return;
+    }
+    // 3. 仅关闭无未保存内容的只读查看弹窗与工具栏
+    if (typeof closePoliticsViewer === 'function') closePoliticsViewer();
+    if (typeof closePaperDetail === 'function') closePaperDetail();
+    if (typeof closeStorageModal === 'function') closeStorageModal();
     closeSnapshotModal();
-    closeConfirmModal(false);
+    hideReadingToolbar();
   }
 });
 
@@ -41,14 +87,14 @@ window.addEventListener('beforeunload', (e) => {
 // =========================================================================
 // 10. 启动初始化流程
 // =========================================================================
-    // ============ 考试倒计时（目标 2026-12-19 06:00，每秒刷新） ============
+// ============ 考试倒计时（目标 2026-12-19 06:00，每秒刷新） ============
 const EXAM_TARGET = new Date('2026-12-19T06:00:00');
 let countdownTimer = null;
 function updateCountdown() {
   let diff = Math.floor((EXAM_TARGET - Date.now()) / 1000); // 剩余总秒数
   const el = document.getElementById('examCountdown');
+  if (!el) return;
   if (diff <= 0) {
-    // 已到达/已过考试时间：显示提示并停止刷新
     el.innerHTML = '<span class="text-sm">🎓</span><span class="text-xs sm:text-sm font-bold text-emerald-700">考试已开始，加油！</span>';
     if (countdownTimer) clearInterval(countdownTimer);
     return;
@@ -65,42 +111,23 @@ function updateCountdown() {
 updateCountdown();
 countdownTimer = setInterval(updateCountdown, 1000);
 
-// 应用启动入口：建库 → 加载数据 → 恢复文件句柄 → 首次全量渲染
+// 应用启动入口：建库 → 分模块加载/迁移 → 恢复目录句柄 → 首次全量渲染
 async function initApp() {
   loadPrefs();
   document.getElementById('quick-todo-date').value = todayISO();
 
-  // 1. 打开 IndexedDB
+  // 1. 打开 IndexedDB v2
   dbInstance = await openDatabase();
 
-  // 2. 加载数据：优先 IndexedDB -> 其次 v4 localStorage -> 其次 v3 localStorage 迁移 -> 默认数据
-  let loaded = await idbGet('state', 'current');
-  if (!loaded) {
-    try {
-      const rawV4 = localStorage.getItem(LS_KEY_V4);
-      const rawV3 = localStorage.getItem(LS_KEY_V3);
-      if (rawV4) loaded = JSON.parse(rawV4);
-      else if (rawV3) loaded = JSON.parse(rawV3);
-    } catch {}
-  }
-  appData = normalizeData(loaded || DEFAULT_DATA);
+  // 2. 启动 v5 分模块存储（若检测到旧版单文件数据则自动无损拆分迁移）
+  await initModularStorage();
 
-  // 3. 检查是否记忆了本地 JSON 文件句柄
-  const savedHandle = await idbGet('handles', 'jsonFile');
-  if (savedHandle && typeof savedHandle.queryPermission === 'function') {
-    try {
-      const perm = await savedHandle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        fileHandle = savedHandle;
-      } else {
-        pendingSavedHandle = savedHandle;
-      }
-    } catch {
-      pendingSavedHandle = savedHandle;
-    }
+  // 2.5 初始化英语阅读模块辅助状态
+  if (typeof initReadingStore === 'function') {
+    await initReadingStore();
   }
 
-  // 4. 初始化样式与渲染
+  // 3. 初始化界面与渲染
   switchTab('math');
   updateSyncUI();
   await refreshSnapshotCount();

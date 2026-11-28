@@ -1,5 +1,5 @@
-// 历史快照弹窗
-// 由 408_v4.html 拆分而来：普通 <script> 加载（兼容 file:// 打开），函数与变量为全局共享
+// 历史快照弹窗（支持 v5 分模块快照与旧版快照无损恢复）
+// 普通 <script> 加载（兼容 file:// 打开），函数与变量为全局共享
 
 // =========================================================================
 // 5. 历史快照弹窗逻辑
@@ -17,10 +17,13 @@ async function openSnapshotModal() {
             <span class="text-sm font-bold text-slate-800">${formatDateTime(s.timestamp)}</span>
             <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${idx === 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}">${escapeHtml(s.reason)}</span>
           </div>
-          <div class="text-xs text-slate-500 mt-1.5 flex items-center gap-3">
-            <span>📐 数学: <b>${s.mathCount}</b></span>
-            <span>💻 408: <b>${s.cs408Count}</b></span>
-            <span>📅 待办: <b>${s.todoCount}</b></span>
+          <div class="text-xs text-slate-500 mt-1.5 flex flex-wrap items-center gap-3">
+            <span>📐 数学: <b>${s.mathCount ?? 0}</b></span>
+            <span>💻 408: <b>${s.cs408Count ?? 0}</b></span>
+            ${s.politicsCount !== undefined ? `<span>📕 政治: <b>${s.politicsCount}</b></span>` : ''}
+            <span>📅 待办: <b>${s.todoCount ?? 0}</b></span>
+            ${s.paperCount !== undefined ? `<span>📝 套卷: <b>${s.paperCount}</b></span>` : ''}
+            ${s.readingCount !== undefined ? `<span>📖 阅读: <b>${s.readingCount}</b></span>` : ''}
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -36,11 +39,12 @@ async function openSnapshotModal() {
 
 // 关闭历史快照弹窗
 function closeSnapshotModal() {
-  document.getElementById('snapshotModal').classList.remove('open');
+  const modal = document.getElementById('snapshotModal');
+  if (modal) modal.classList.remove('open');
 }
 
 
-// 将某条历史快照的数据恢复到当前库（覆盖前需确认）
+// 将某条历史快照的数据恢复到当前分模块库（覆盖前需确认）
 async function restoreSnapshot(snapId) {
   const list = await idbGetAllSnapshots();
   const target = list.find(s => s.id === snapId);
@@ -55,8 +59,32 @@ async function restoreSnapshot(snapId) {
   if (!ok) return;
 
   await createSnapshot('恢复快照前自动备份');
-  appData = normalizeData(target.data);
-  await persistData(true);
+
+  if (target.modules && typeof target.modules === 'object') {
+    // v5 分模块快照
+    const restoredKeys = [];
+    for (const m of STORAGE_MODULES) {
+      if (target.modules[m.key] !== undefined) {
+        setModuleData(m.key, target.modules[m.key]);
+        restoredKeys.push(m.key);
+      }
+    }
+    await persistModules(restoredKeys, true);
+  } else if (target.data) {
+    // 兼容旧版 v4 快照
+    const norm = normalizeData(target.data);
+    appData.math = norm.math;
+    appData['408'] = norm['408'];
+    appData.todos = norm.todos;
+    appData.papers = norm.papers;
+    const restoredKeys = ['math', '408', 'todos', 'papers'];
+    if (Array.isArray(target.readingsData)) {
+      setModuleData('readings', target.readingsData);
+      restoredKeys.push('readings');
+    }
+    await persistModules(restoredKeys, true);
+  }
+
   renderAll();
   closeSnapshotModal();
   showToast('已成功恢复至所选历史快照！', 'success');
@@ -68,7 +96,16 @@ async function exportSnapshot(snapId) {
   const list = await idbGetAllSnapshots();
   const target = list.find(s => s.id === snapId);
   if (!target) return;
-  const blob = new Blob([JSON.stringify(target.data, null, 2)], { type: 'application/json;charset=utf-8' });
+  const payload = target.modules
+    ? {
+        app: '考研复盘工作台（历史快照）',
+        schemaVersion: STORAGE_SCHEMA_VERSION,
+        snapshotAt: new Date(target.timestamp).toISOString(),
+        reason: target.reason,
+        modules: target.modules
+      }
+    : target.data;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

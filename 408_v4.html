@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>考研数学与408薄弱点遗忘追踪表 v4 & 每日待办</title>
+  <title>考研复盘工作台 v5 · 数学 / 408 / 政治 / 英语阅读 & 每日待办</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <meta name="theme-color" content="#4f46e5" />
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts: Inter -->
+  <!-- Google Fonts & 霞鹜文楷（Claude 风格温润书卷楷体 / 思源宋体 / Inter 无衬线，离线自动回退系统楷体/宋体） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.min.css">
   <link rel="stylesheet" href="css/app.css">
   <!-- KaTeX 数学公式渲染（CDN，加载失败时降级显示原始 TeX 文本） -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
@@ -17,7 +20,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
     onload="if(window.renderMathAll)window.renderMathAll()"></script>
 </head>
-<body class="min-h-screen pb-16 selection:bg-blue-100 selection:text-blue-900">
+<body class="font-claude-kai min-h-screen pb-16 selection:bg-blue-100 selection:text-blue-900">
 
   <!-- ==================== 顶部导航栏（磨砂玻璃） ==================== -->
   <header class="glass-topbar sticky top-0 z-40 border-b border-slate-200/80 shadow-sm">
@@ -29,10 +32,10 @@
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">考研数学与408薄弱点遗忘追踪表</h1>
-            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">v4</span>
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">考研全科薄弱点与错题工作台</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">v5 分散存储</span>
           </div>
-          <p class="text-xs text-slate-500">IndexedDB 主库 + 自动快照 + 本地 JSON 双向同步</p>
+          <p class="text-xs text-slate-500">IndexedDB 分模块库 + 自动快照 + 本地目录按模块分散落盘</p>
         </div>
       </div>
 
@@ -51,9 +54,9 @@
       <div class="flex flex-wrap xl:flex-nowrap items-center justify-end gap-2 shrink-0">
         <!-- ===== 状态组：同步状态 / 自动写盘 ===== -->
         <div class="flex flex-wrap xl:flex-nowrap items-center justify-end gap-2 min-w-0">
-          <span id="syncBadge" class="hdr-ctrl bg-slate-100 text-slate-600 border border-slate-200/80 max-w-[120px]">
+          <span id="syncBadge" class="hdr-ctrl bg-slate-100 text-slate-600 border border-slate-200/80 max-w-[160px]">
             <span id="syncDot" class="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
-            <span id="syncText" class="truncate">IndexedDB 本地库</span>
+            <span id="syncText" class="truncate">IndexedDB 分模块库</span>
           </span>
 
           <!-- 一键恢复文件句柄权限按钮（刷新后有已保存句柄时出现） -->
@@ -79,17 +82,23 @@
             <kbd class="hidden 2xl:inline-block ml-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-white/20 rounded">Ctrl+S</kbd>
           </button>
 
+          <!-- 中文字体切换（默认 Claude 书卷楷体，可切 楷体 / 宋体 / 黑体） -->
+          <button id="fontSwitchBtn" onclick="cycleFontPreset()" class="hdr-ctrl hdr-ghost" title="当前字体：Claude 书卷楷体（点击切换：楷体 / 宋体 / 黑体）">
+            <span>🖋️</span>
+            <span id="fontSwitchText">楷体</span>
+          </button>
+
           <!-- 历史快照 -->
           <button onclick="openSnapshotModal()" class="hdr-ctrl hdr-ghost">
             🕒 历史快照
             <span id="snapshotCountBadge" class="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">0</span>
           </button>
 
-          <!-- 数据工具组：绑定 / 导入 / 导出 合成一整块，宽度不再参差 -->
+          <!-- 数据工具组：绑定目录 / 存储中心 / 导出备份 -->
           <div class="hdr-group">
-            <button onclick="bindLocalJson()" title="绑定本地 JSON 文件，支持直接读写">📂 绑定JSON</button>
-            <button onclick="document.getElementById('importFileInput').click()" title="从 JSON 文件导入数据">📥 导入</button>
-            <button onclick="exportJson()" title="导出当前全部数据为 JSON 文件">📤 导出</button>
+            <button onclick="bindDataDirectory()" title="绑定一个本地数据文件夹，将数学/408/政治/待办/套卷/阅读拆分为独立 JSON 同步">📁 绑定目录</button>
+            <button onclick="openStorageModal()" title="打开分模块存储中心：查看各模块文件体积、单独导入导出或导入旧版单文件自动拆分">🗄️ 存储中心</button>
+            <button onclick="exportFullBundleJson()" title="导出全部 6 个模块与截图的全量备份包">📤 导出</button>
           </div>
           <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="handleImportFile(event)" />
         </div>
@@ -108,6 +117,10 @@
         <span>💻 408 专业课</span>
         <span id="tabCount-408" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
       </button>
+      <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="politics" onclick="switchTab('politics')">
+        <span>📕 考研政治</span>
+        <span id="tabCount-politics" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+      </button>
       <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="todo" onclick="switchTab('todo')">
         <span>📅 每日待办</span>
         <span id="tabCount-todo" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
@@ -115,6 +128,10 @@
       <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="paper" onclick="switchTab('paper')">
         <span>📝 套卷记录</span>
         <span id="tabCount-paper" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+      </button>
+      <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="reading" onclick="switchTab('reading')">
+        <span>📖 英语阅读</span>
+        <span id="tabCount-reading" class="tab-count px-2 py-0.5 rounded-full text-xs font-bold">0</span>
       </button>
       <button class="tab-btn btn-tactile flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap" data-tab="stat" onclick="switchTab('stat')">
         <span>📊 统计</span>
@@ -210,6 +227,63 @@
       <div id="pagination-408" class="mt-4"></div>
     </section>
 
+    <!-- ==================== VIEW 2.5: 考研政治（选择题错题 + 知识点） ==================== -->
+    <section id="view-politics" class="view-section">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-5" id="stats-politics"></div>
+
+      <!-- 工具栏 -->
+      <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <select id="filter-subject-politics" onchange="onRecordFilterChange('politics')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none"></select>
+          <select id="filter-kind-politics" onchange="onRecordFilterChange('politics')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none">
+            <option value="">全部形态</option>
+            <option value="single">🔘 单选题</option>
+            <option value="multi">☑️ 多选题</option>
+            <option value="knowledge">📝 纯知识点</option>
+          </select>
+          <select id="filter-status-politics" onchange="onRecordFilterChange('politics')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none">
+            <option value="">全部状态</option>
+            <option value="待解决">待解决</option>
+            <option value="复习中">复习中</option>
+            <option value="已掌握">已掌握</option>
+          </select>
+          <select id="sort-politics" onchange="onRecordFilterChange('politics')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none">
+            <option value="forgetDesc">按遗忘次数 ↓</option>
+            <option value="dateDesc">按最近日期 ↓</option>
+            <option value="firstDateDesc">按首次日期 ↓</option>
+            <option value="accuracyAsc">按自测正确率 ↑</option>
+          </select>
+          <div class="relative">
+            <input type="text" id="search-politics" placeholder="搜索考点 / 题干 / 选项 / 解析..." oninput="onRecordFilterChange('politics')"
+              class="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none transition-all" />
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- 全局自测重做模式开关 -->
+          <button id="politicsQuizToggleBtn" onclick="togglePoliticsQuizMode()" class="btn-tactile inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100" title="隐藏所有选择题答案与知识点笔记，开启刷题自测判分">
+            🙈 自测重做
+          </button>
+          <!-- 视图切换：大卡片 / 紧凑表格 -->
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200/80">
+            <button id="viewBtn-politics-card" onclick="setViewMode('politics', 'card')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">🗂️ 大卡片</button>
+            <button id="viewBtn-politics-table" onclick="setViewMode('politics', 'table')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">📋 紧凑表格</button>
+          </div>
+          <button onclick="openPoliticsModal('', 'knowledge')" class="btn-tactile inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100">
+            ＋ 知识点
+          </button>
+          <button onclick="openPoliticsModal('', 'choice')" class="btn-tactile inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 shadow-sm shadow-rose-500/20">
+            ＋ 新增政治错题
+          </button>
+        </div>
+      </div>
+
+      <!-- 政治内容容器 -->
+      <div id="records-container-politics"></div>
+      <div id="pagination-politics" class="mt-4"></div>
+    </section>
+
     <!-- ==================== VIEW 3: 每日待办 ==================== -->
     <section id="view-todo" class="view-section">
       <!-- 统计条（左，4 条竖叠、自动撑满热力图高度）+ 热力图（右，固定宽度），小屏自动上下堆叠 -->
@@ -289,19 +363,19 @@
       <!-- 工具栏 -->
       <div class="bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-4 mb-5 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-2.5">
-          <select id="filter-paper-mod" onchange="renderPapers()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+          <select id="filter-paper-mod" onchange="onRecordFilterChange('papers')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
             <option value="">全部科目</option>
             <option value="math">考研数学</option>
             <option value="408">408 专业课</option>
           </select>
-          <select id="filter-paper-cat" onchange="renderPapers()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none"></select>
-          <select id="sort-paper" onchange="renderPapers()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+          <select id="filter-paper-cat" onchange="onRecordFilterChange('papers')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none"></select>
+          <select id="sort-paper" onchange="onRecordFilterChange('papers')" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
             <option value="dateDesc">按日期 ↓</option>
             <option value="scoreDesc">按总分 ↓</option>
             <option value="scoreAsc">按总分 ↑</option>
           </select>
           <div class="relative">
-            <input type="text" id="search-paper" placeholder="搜索卷名 / 错误点 / 备注..." oninput="renderPapers()"
+            <input type="text" id="search-paper" placeholder="搜索卷名 / 错误点 / 备注..." oninput="onRecordFilterChange('papers')"
               class="w-full sm:w-56 pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
           </div>
@@ -313,6 +387,77 @@
 
       <!-- 套卷卡片容器 -->
       <div id="papers-container"></div>
+      <div id="pagination-papers" class="mt-4"></div>
+    </section>
+
+    <!-- ==================== VIEW 4.5: 英语阅读总结 ==================== -->
+    <section id="view-reading" class="view-section">
+      <div id="reading-layout" class="flex flex-col lg:flex-row gap-4 items-start">
+        <!-- 左：文章列表（可收起，默认紧凑宽度） -->
+        <aside id="reading-left-pane" class="w-full lg:w-60 xl:w-64 shrink-0 bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-3.5 lg:sticky lg:top-24 transition-all">
+          <div class="flex items-center justify-between gap-1 mb-2">
+            <div class="text-sm font-bold text-slate-800 shrink-0">📚 阅读文章</div>
+            <div class="flex items-center gap-1">
+              <button onclick="openPdfImportModal()" class="btn-tactile px-2 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" title="导入 PDF（考研真题/外刊）自动拆出文章">📄 PDF</button>
+              <button onclick="openReadingModal()" class="btn-tactile px-2 py-1 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">＋ 新增</button>
+              <button onclick="toggleReadingLeftPane()" class="hidden lg:inline-flex btn-tactile w-6 h-6 items-center justify-center rounded-lg text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="收起文章列表，扩大阅读区">«</button>
+            </div>
+          </div>
+          <!-- 独立阅读存储状态与绑定/导入/导出工具条（不存入主 JSON，仅通过 readingIndex 与主 JSON 保持关联） -->
+          <div class="mb-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] space-y-1.5">
+            <div class="flex items-center justify-between gap-1">
+              <span id="readingStoreBadge" class="inline-flex items-center gap-1 font-semibold text-slate-600 truncate" title="阅读文章存储在独立库中，主 JSON 仅保存轻量关联索引">
+                <span id="readingStoreDot" class="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+                <span id="readingStoreText" class="truncate">独立模块 readings.json</span>
+              </span>
+              <button id="readingReconnectBtn" onclick="reconnectReadingJson()" class="hidden px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold hover:bg-amber-200 shrink-0">恢复文件</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1">
+              <button onclick="openStorageModal()" class="btn-tactile py-1 rounded-lg bg-white border border-slate-200/90 text-slate-700 font-semibold hover:bg-slate-100" title="打开分模块存储中心管理 readings.json 与目录同步">🗄️ 存储</button>
+              <button onclick="document.getElementById('importReadingInput').click()" class="btn-tactile py-1 rounded-lg bg-white border border-slate-200/90 text-slate-700 font-semibold hover:bg-slate-100" title="从独立的 readings.json 导入文章">📥 导入</button>
+              <button onclick="exportReadingJson()" class="btn-tactile py-1 rounded-lg bg-white border border-slate-200/90 text-slate-700 font-semibold hover:bg-slate-100" title="导出英语阅读独立模块 readings.json">📤 导出</button>
+            </div>
+            <input type="file" id="importReadingInput" accept=".json" class="hidden" onchange="handleImportReadingFile(event)" />
+          </div>
+          <div class="space-y-1.5 mb-2.5">
+            <div class="relative">
+              <input type="text" placeholder="搜索标题 / 原文 / 批注 / 题材..." oninput="onReadingSearch(this.value)"
+                class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/70 text-xs text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+              <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <select id="reading-list-source-filter" onchange="onReadingListFilterChange()" class="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50/70 text-[11px] text-slate-600 focus:bg-white focus:border-blue-500 outline-none">
+                <option value="">全部来源</option>
+              </select>
+              <select id="reading-list-status-filter" onchange="onReadingListFilterChange()" class="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50/70 text-[11px] text-slate-600 focus:bg-white focus:border-blue-500 outline-none">
+                <option value="all">全部状态</option>
+                <option value="summarized">已写总结</option>
+                <option value="unsummarized">待写总结</option>
+                <option value="hasGist">含段意</option>
+              </select>
+            </div>
+          </div>
+          <div id="reading-list" class="space-y-2 lg:max-h-[calc(100vh-17rem)] overflow-y-auto pr-0.5"></div>
+        </aside>
+        <!-- 中：阅读器 + 段落笔记 + 总结（自适应撑满，占比最大） -->
+        <div id="reading-reader" class="w-full lg:flex-1 bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm min-w-0"></div>
+        <!-- 右：批注与生词/长难句复习栏（可收起） -->
+        <aside id="reading-right-pane" class="w-full lg:w-72 xl:w-80 shrink-0 bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm p-3.5 lg:sticky lg:top-24 transition-all">
+          <div class="flex items-center justify-between gap-1.5 mb-2">
+            <div class="text-sm font-bold text-slate-800">🖍️ 高亮与评论</div>
+            <div class="flex items-center gap-1">
+              <button id="rd-quiz-toggle-btn" onclick="toggleReadingQuizMode()" class="btn-tactile px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200" title="自测模式：遮挡批注的释义与评论，悬停或点击揭晓答案">🙈 自测</button>
+              <button onclick="toggleReadingRightPane()" class="hidden lg:inline-flex btn-tactile w-6 h-6 items-center justify-center rounded-lg text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="收起右侧批注栏，进入专注阅读模式">»</button>
+            </div>
+          </div>
+          <div class="relative mb-2">
+            <input type="text" id="reading-ann-search" placeholder="搜索本篇批注 / 释义 / 评论..." oninput="onReadingAnnSearch(this.value)"
+              class="w-full pl-7 pr-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50/70 text-[11px] text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]">🔍</span>
+          </div>
+          <div id="reading-side" class="lg:max-h-[calc(100vh-14.5rem)] overflow-y-auto pr-0.5"></div>
+        </aside>
+      </div>
     </section>
 
     <!-- ==================== VIEW 5: 统计 ==================== -->
@@ -323,13 +468,21 @@
   </main>
 
   <!-- ==================== MODAL 1: 薄弱点编辑 / 新增 ==================== -->
-  <div id="recordModal" class="modal-backdrop" onclick="if(event.target===this) closeRecordModal()">
-    <div id="recordModalPanel" class="modal-panel bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
+  <div id="recordModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
+    <div id="recordModalPanel" class="modal-panel bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
         <h3 id="recordModalTitle" class="text-base font-bold text-slate-900">新增薄弱点</h3>
         <button onclick="closeRecordModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
       </div>
-      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+      <div class="modal-scroll-body p-6 sm:p-7 space-y-4 max-h-[84vh] overflow-y-auto">
+        <!-- 自动草稿恢复提示条 -->
+        <div id="rec-draft-banner" class="hidden flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs">
+          <span class="text-amber-800 font-semibold">📝 检测到上次未保存草稿（<span id="rec-draft-time"></span>）</span>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="restoreRecordDraft()" class="btn-tactile px-2.5 py-1 rounded-lg font-bold bg-amber-600 text-white hover:bg-amber-700">恢复草稿</button>
+            <button type="button" onclick="dismissRecordDraft()" class="btn-tactile px-2 py-1 rounded-lg font-medium bg-white border border-amber-200 text-amber-800 hover:bg-amber-100">丢弃</button>
+          </div>
+        </div>
         <input type="hidden" id="rec-module" />
         <input type="hidden" id="rec-id" />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -400,29 +553,37 @@
                 class="md-tab-btn" title="左边写，右边实时渲染">⇔ 分屏</button>
               <button type="button" id="rec-note-tab-preview" onclick="recNoteSwitchTab('preview')"
                 class="md-tab-btn">👁️ 预览</button>
+              <button type="button" id="rec-note-fullscreen-btn" onclick="toggleModalEditorFullscreen('recordModalPanel','rec-note-fullscreen-btn')"
+                class="md-tab-btn" title="放大写作空间">⛶ 放大</button>
             </div>
           </div>
-          <div id="rec-note-toolbar" class="flex flex-wrap items-center gap-1 mb-2">
+          <div id="rec-note-toolbar" class="flex flex-wrap items-center gap-1 mb-2.5">
             <button type="button" onclick="recNoteWrapSel('**','**','加粗文字')" title="加粗（Ctrl+B）" class="md-tool font-bold">B</button>
             <button type="button" onclick="recNoteWrapSel('*','*','斜体文字')" title="斜体（Ctrl+I）" class="md-tool italic font-serif">I</button>
+            <button type="button" onclick="recNoteWrapSel('==','==','重点高亮')" title="荧光高亮 ==文字==（Ctrl+H）" class="md-tool md-tool-mark">高亮</button>
             <button type="button" onclick="recNoteWrapSel('~~','~~','删除文字')" title="删除线" class="md-tool line-through">S</button>
-            <button type="button" onclick="recNoteWrapSel('`','`','代码')" title="行内代码" class="md-tool font-mono text-[11px]">&lt;code&gt;</button>
+            <button type="button" onclick="recNoteWrapSel('`','`','代码')" title="行内代码（Ctrl+E）" class="md-tool font-mono text-[11px]">&lt;code&gt;</button>
             <span class="w-px h-4 bg-slate-200 mx-0.5"></span>
             <button type="button" onclick="recNotePrefixLines('## ')" title="标题" class="md-tool font-bold">H</button>
-            <button type="button" onclick="recNotePrefixLines('- ')" title="无序列表" class="md-tool">• 列表</button>
-            <button type="button" onclick="recNotePrefixLines('', true)" title="有序列表" class="md-tool">1. 序号</button>
+            <button type="button" onclick="recNotePrefixLines('- ')" title="无序列表（支持回车自动续行）" class="md-tool">• 列表</button>
+            <button type="button" onclick="recNotePrefixLines('', true)" title="有序列表（支持回车序号自增）" class="md-tool">1. 序号</button>
+            <button type="button" onclick="recNotePrefixLines('- [ ] ')" title="待办复选框" class="md-tool">☑ 任务</button>
             <button type="button" onclick="recNotePrefixLines('> ')" title="引用" class="md-tool">❝ 引用</button>
+            <button type="button" onclick="recNoteInsert('\n> [!WARN] 易错避坑\n> 写下容易踩坑的前提条件...\n')" title="插入避坑提示框" class="md-tool">⚠️ 避坑框</button>
             <span class="w-px h-4 bg-slate-200 mx-0.5"></span>
-            <button type="button" onclick="recNoteWrapSel('$', '$', '\\log_2 n')" title="行内公式 $...$（LaTeX）" class="md-tool">∑ 公式</button>
-            <button type="button" onclick="recNoteInsert('\n$$\n\\frac{a}{b}\n$$\n')" title="独立公式块 $$...$$（LaTeX）" class="md-tool">∑∑ 公式块</button>
+            <button type="button" onclick="recNoteWrapSel('$', '$', 'x^2')" title="快速包裹行内公式 $...$（Ctrl+M）" class="md-tool">$ 行内</button>
+            <button type="button" onclick="openMathStudio('rec-note','formula')" title="打开可视化公式编辑器（Ctrl+Shift+M，光标放在已有公式内可原位修改）" class="md-tool md-tool-accent">∫ 公式编辑器</button>
+            <button type="button" onclick="openMathStudio('rec-note','matrix')" title="Excel 式可视化矩阵 / 行列式 / 增广阵 / 分段函数生成器（Ctrl+Shift+X）" class="md-tool md-tool-accent">⊞ 矩阵</button>
+            <button type="button" onclick="openMathStudio('rec-note','symbols')" title="按中文俗称搜索 LaTeX 符号并一键插入" class="md-tool md-tool-accent">📖 符号俗称</button>
+            <span class="w-px h-4 bg-slate-200 mx-0.5"></span>
             <button type="button" onclick="recNoteWrapSel('[', '](https://)', '链接文字')" title="插入链接" class="md-tool">🔗 链接</button>
             <button type="button" onclick="recNoteInsert('\n| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n')" title="插入表格" class="md-tool">▦ 表格</button>
             <button type="button" onclick="recNoteInsert('\n```\n代码块\n```\n')" title="插入代码块" class="md-tool">{ } 代码块</button>
           </div>
           <div id="rec-note-flex" class="rec-note-flex">
-            <textarea id="rec-note" rows="7" onkeydown="recNoteKeydown(event)" oninput="recNoteLivePreview()" placeholder="记录为什么错、核心公式/结论是什么、下次怎么避坑...&#10;&#10;支持 Markdown：**加粗**、*斜体*、`代码`、## 标题、- 列表、> 引用、[链接](url)、表格&#10;数学公式：行内 $\\log_2 n$、独立块 $$E=mc^2$$"
-              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm leading-relaxed focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
-            <div id="rec-note-preview" class="hidden md-body w-full px-3.5 py-3 rounded-xl border border-slate-200 bg-slate-50/60 text-sm text-slate-700 min-h-[9.5rem] max-h-80 overflow-y-auto"></div>
+            <textarea id="rec-note" rows="13" onkeydown="recNoteKeydown(event)" oninput="recNoteLivePreview()" placeholder="记录为什么错、核心公式/结论是什么、下次怎么避坑...&#10;&#10;支持：==重点高亮==、**加粗**、- [ ] 任务、> [!WARN] 避坑框、代码块、表格&#10;快捷键：Ctrl+B 加粗 · Ctrl+H 高亮 · Ctrl+M 公式 · Ctrl+Shift+M 公式编辑器 · Ctrl+Shift+X 矩阵生成器"
+              class="rec-note-ta w-full px-4 py-3 rounded-xl border border-slate-200 text-sm leading-relaxed focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+            <div id="rec-note-preview" class="hidden md-body rec-note-pv w-full px-5 py-4 rounded-xl border border-slate-200 bg-slate-50/60 text-sm text-slate-700 overflow-y-auto"></div>
           </div>
         </div>
         <div id="rec-forget-history-wrap" class="hidden">
@@ -438,7 +599,7 @@
   </div>
 
   <!-- ==================== MODAL 2: 每日待办编辑 ==================== -->
-  <div id="todoModal" class="modal-backdrop" onclick="if(event.target===this) closeTodoModal()">
+  <div id="todoModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
     <div class="modal-panel bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
         <h3 class="text-base font-bold text-slate-900">编辑待办事项</h3>
@@ -496,7 +657,7 @@
   </div>
 
   <!-- ==================== MODAL 2.5: 套卷编辑 / 新增 ==================== -->
-  <div id="paperModal" class="modal-backdrop" onclick="if(event.target===this) closePaperModal()">
+  <div id="paperModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
     <div class="modal-panel bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-100 overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
         <h3 id="paperModalTitle" class="text-base font-bold text-slate-900">📝 新增套卷</h3>
@@ -630,7 +791,7 @@
         <p id="confirmMessage" class="text-sm text-slate-600 leading-relaxed"></p>
       </div>
       <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2.5">
-        <button onclick="closeConfirmModal(false)" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button id="confirmCancelBtn" onclick="closeConfirmModal(false)" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
         <button id="confirmOkBtn" onclick="closeConfirmModal(true)" class="btn-tactile px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 shadow-sm">确认</button>
       </div>
     </div>
@@ -638,15 +799,644 @@
 
   <!-- ==================== MODAL 4.5: 卡片详情查看（FLIP 平滑动画） ==================== -->
   <div id="viewerModal" class="modal-backdrop" onclick="if(event.target===this) closeRecordViewer()">
-    <div id="viewerPanel" class="viewer-panel bg-white rounded-2xl w-full max-w-3xl shadow-2xl border border-slate-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+    <div id="viewerPanel" class="viewer-panel bg-white rounded-2xl w-full max-w-5xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 sm:px-8 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
         <h3 class="text-base font-bold text-slate-900">🔍 薄弱点详情</h3>
         <button onclick="closeRecordViewer()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
       </div>
-      <div id="viewerBody" class="p-6 space-y-4 max-h-[75vh] overflow-y-auto"></div>
+      <div id="viewerBody" class="p-7 sm:p-9 space-y-6 max-h-[82vh] overflow-y-auto"></div>
       <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
         <button onclick="closeRecordViewer()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">关闭</button>
         <button id="viewerEditBtn" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">✏️ 编辑此记录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 5: 英语阅读 · 文章编辑（支持按段落粘贴 + 全文粘贴） ==================== -->
+  <div id="readingModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div class="flex items-center gap-2.5">
+          <h3 id="readingModalTitle" class="text-base font-bold text-slate-900">📖 新增阅读文章</h3>
+          <span id="rd-modal-stats" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">0 段 · 0 词</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeReadingModal().then(() => { if (!document.getElementById('readingModal').classList.contains('open')) openPdfImportModal(); })" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100" title="直接上传 PDF 自动拆出文章">📄 从 PDF 拆文章</button>
+          <button onclick="closeReadingModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+        </div>
+      </div>
+      <div class="p-6 space-y-4 max-h-[78vh] overflow-y-auto">
+        <input type="hidden" id="rd-id" />
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">标题 *</label>
+          <input type="text" id="rd-title" placeholder="例如：2023 英语一 Text 2 / The Economist: AI and jobs"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">来源 / 分类</label>
+            <input type="text" id="rd-source" list="rd-source-presets" placeholder="如：英一真题 / 外刊精读"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+            <datalist id="rd-source-presets">
+              <option value="英一真题"></option>
+              <option value="英二真题"></option>
+              <option value="模拟题"></option>
+              <option value="外刊精读"></option>
+              <option value="新题型"></option>
+              <option value="翻译"></option>
+              <option value="完形填空"></option>
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">题材标签（可选）</label>
+            <input type="text" id="rd-topic" list="rd-topic-presets" placeholder="如：科技 / 经济 / 社会"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+            <datalist id="rd-topic-presets">
+              <option value="科技"></option>
+              <option value="经济"></option>
+              <option value="社会"></option>
+              <option value="文化"></option>
+              <option value="教育"></option>
+              <option value="法律"></option>
+              <option value="环境"></option>
+              <option value="医疗"></option>
+              <option value="职场"></option>
+              <option value="心理"></option>
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">阅读日期</label>
+            <input type="date" id="rd-date"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+          </div>
+        </div>
+        <!-- 刷题记录（可选：做对题数 / 总题数 / 用时） -->
+        <div class="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50/80 border border-slate-200/70">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">做对题数（可选）</label>
+            <input type="number" min="0" max="50" id="rd-correct" placeholder="如 4"
+              class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">总题数（可选）</label>
+            <input type="number" min="0" max="50" id="rd-total" placeholder="如 5"
+              class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">做题用时 / 分钟</label>
+            <input type="number" min="0" max="300" id="rd-duration" placeholder="如 16"
+              class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-sm focus:border-blue-500 outline-none" />
+          </div>
+        </div>
+
+        <!-- 原文录入区：按段落粘贴 vs 全文粘贴 双模式 -->
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-semibold text-slate-500">原文 *</label>
+              <div class="inline-flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                <button type="button" id="rd-mode-tab-paras" onclick="switchReadingModalMode('paras')" class="md-tab-btn md-tab-active">🧩 按段落粘贴</button>
+                <button type="button" id="rd-mode-tab-full" onclick="switchReadingModalMode('full')" class="md-tab-btn">📄 全文粘贴</button>
+              </div>
+            </div>
+            <div id="rd-full-tools" class="hidden flex flex-wrap items-center gap-1.5">
+              <button type="button" id="rd-modal-undo-btn" onclick="undoModalReadingText()" class="hidden btn-tactile px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100" title="撤回刚才的合并断行或分段操作">↩️ 撤回</button>
+              <button type="button" onclick="mergeReadingLineBreaks()" class="btn-tactile px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100" title="智能识别缩进、段尾短行与句号，合并段内换行并保留段落">🧹 智能合并断行</button>
+              <button type="button" onclick="autoSplitReadingParagraphs()" class="btn-tactile px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200" title="如果已经合成了一整块，点击按每 3~4 句智能切分段落">✂️ 智能重分段</button>
+            </div>
+          </div>
+
+          <!-- 模式 A：按段落粘贴 -->
+          <div id="rd-pane-paras" class="space-y-3">
+            <div class="p-3 rounded-xl bg-blue-50/55 border border-blue-200/80 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <span class="font-bold text-blue-800">⚡ 快速按段粘贴区（连续复制第 1 段、第 2 段… 直接 Ctrl+V 即可）</span>
+                <div class="flex flex-wrap items-center gap-2.5 text-slate-600">
+                  <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+                    <input type="checkbox" id="rd-opt-clean-paste" checked class="accent-blue-600" />
+                    <span>自动清断行</span>
+                  </label>
+                  <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+                    <input type="checkbox" id="rd-opt-auto-append" checked class="accent-blue-600" />
+                    <span>粘贴即追加成段</span>
+                  </label>
+                </div>
+              </div>
+              <textarea id="rd-para-quick-input" rows="3"
+                onpaste="onReadingParaQuickPaste(event)"
+                onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();appendQuickParaInput();}"
+                placeholder="在此 Ctrl+V 粘贴一段原文（开启「粘贴即追加成段」后，粘贴完会自动清理段内断行并生成下方段落卡片，输入框自动清空等你粘下一段；如果一次粘了多段空行分隔文本，会自动拆成多段）…"
+                class="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white text-sm font-serif leading-relaxed focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <button type="button" onclick="appendQuickParaInput()" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs">＋ 追加为新段落 (Ctrl+Enter)</button>
+                  <button type="button" onclick="pasteClipboardAsPara()" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border border-blue-200 text-blue-700 hover:bg-blue-50" title="直接读取剪贴板文字清理断行并追加一段">📋 从剪贴板追加</button>
+                  <button type="button" onclick="addEmptyModalPara()" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">＋ 空白段落</button>
+                </div>
+                <button type="button" onclick="cleanAllModalParas()" class="btn-tactile px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100" title="一键清理所有段落内部的 PDF 断行和连字符">🧹 全部清断行</button>
+              </div>
+            </div>
+            <!-- 已有段落卡片列表 -->
+            <div id="rd-paras-list" class="space-y-2.5"></div>
+          </div>
+
+          <!-- 模式 B：全文粘贴 -->
+          <div id="rd-pane-full" class="hidden">
+            <textarea id="rd-text" rows="13" oninput="updateReadingModalStats()" placeholder="把英语阅读原文粘贴到这里（空行分段）…（也可切换到「🧩 按段落粘贴」逐段粘贴，或在阅读器中选句首按「分段」）"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm leading-relaxed font-serif focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+          </div>
+          <p id="rd-text-warn" class="hidden text-[11px] text-amber-600 mt-1.5">⚠️ 修改原文后会按原文字重新定位已有批注，找不到对应文字的批注将被移除</p>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
+        <button onclick="closeReadingModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button onclick="saveReadingModal()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">保存文章</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 6: 英语阅读 · 批注评论 ==================== -->
+  <div id="readingNoteModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 class="text-base font-bold text-slate-900">💬 批注 / 评论</h3>
+        <button onclick="closeReadingNoteModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <input type="hidden" id="rdn-id" />
+        <div class="flex items-start gap-2 bg-amber-50/60 border-l-4 border-amber-300 rounded-r-xl px-4 py-2.5">
+          <blockquote id="rdn-quote" class="flex-1 font-serif text-[15px] leading-relaxed text-slate-800 break-words"></blockquote>
+          <button type="button" onclick="speakReadingQuoteInModal()" class="btn-tactile shrink-0 px-2 py-1 rounded-lg text-xs font-semibold bg-white/80 border border-amber-200 text-amber-800 hover:bg-white" title="浏览器英语朗读">🔊</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">类型</label>
+            <select id="rdn-kind" onchange="updateReadingNoteHints()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-blue-500 outline-none">
+              <option value="word">单词</option>
+              <option value="phrase">短语</option>
+              <option value="sentence">句子</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">高亮颜色</label>
+            <div id="rdn-colors" class="flex items-center gap-2 h-[38px]">
+              <button type="button" data-color="yellow" onclick="pickReadingNoteColor('yellow')" class="rd-tb-color rd-c-yellow" title="黄色（如：生词）"></button>
+              <button type="button" data-color="green" onclick="pickReadingNoteColor('green')" class="rd-tb-color rd-c-green" title="绿色（如：好表达/短语）"></button>
+              <button type="button" data-color="blue" onclick="pickReadingNoteColor('blue')" class="rd-tb-color rd-c-blue" title="蓝色（如：长难句）"></button>
+              <button type="button" data-color="pink" onclick="pickReadingNoteColor('pink')" class="rd-tb-color rd-c-pink" title="粉色（如：出题句/转折点）"></button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">释义 / 要点</label>
+          <input type="text" id="rdn-meaning"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">评论 / 精读笔记
+            <span class="ml-1 align-middle text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md">Markdown</span>
+          </label>
+          <textarea id="rdn-comment" rows="6" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();saveReadingNoteModal();}"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm leading-relaxed focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+          <p class="text-[11px] text-slate-400 mt-1">Ctrl + Enter 快速保存</p>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2.5">
+        <button onclick="deleteReadingNoteFromModal()" class="btn-tactile px-3.5 py-2 rounded-xl text-sm font-medium bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100">🗑️ 删除批注</button>
+        <div class="flex gap-2.5">
+          <button onclick="closeReadingNoteModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+          <button onclick="saveReadingNoteModal()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 7: 英语阅读 · PDF 智能拆文章工作台 ==================== -->
+  <div id="pdfImportModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-5xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">📄 PDF 智能拆文章工作台</h3>
+          <p class="text-xs text-slate-500 mt-0.5">支持考研英语真题 PDF（自动拆 Text 1~4 并剔除选择题）、外刊/讲义 PDF，全本地浏览器解析</p>
+        </div>
+        <button onclick="closePdfImportModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <input type="file" id="pdfFileInput" accept=".pdf,application/pdf" class="hidden" onchange="onPdfFileInputChange(event)" />
+      <div id="pdf-import-body" ondragover="event.preventDefault()" ondrop="onPdfDropZoneDrop(event)" class="p-5 space-y-3.5 max-h-[76vh] overflow-y-auto"></div>
+      <div class="px-6 py-3.5 border-t border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2.5">
+        <span id="pdf-import-footer-info" class="text-xs text-slate-500">完全在浏览器本地解析，不上传任何文件</span>
+        <div class="flex gap-2.5">
+          <button onclick="closePdfImportModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">关闭</button>
+          <button id="pdf-import-submit-btn" onclick="importCheckedPdfArticles()" disabled class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-45 disabled:cursor-not-allowed shadow-sm">📥 批量导入阅读库</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 8: 考研政治 · 新增/编辑错题与知识点 ==================== -->
+  <div id="politicsModal" class="modal-backdrop" onclick="if(event.target===this) guardEditorBackdrop(this)">
+    <div id="politicsModalPanel" class="modal-panel bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 id="politicsModalTitle" class="text-base font-bold text-slate-900">📕 新增政治错题 / 知识点</h3>
+        <button onclick="closePoliticsModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div class="modal-scroll-body p-6 sm:p-7 space-y-4 max-h-[84vh] overflow-y-auto">
+        <!-- 自动草稿恢复提示条 -->
+        <div id="pol-draft-banner" class="hidden flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs">
+          <span class="text-amber-800 font-semibold">📝 检测到上次未保存草稿（<span id="pol-draft-time"></span>）</span>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="restorePoliticsDraft()" class="btn-tactile px-2.5 py-1 rounded-lg font-bold bg-amber-600 text-white hover:bg-amber-700">恢复草稿</button>
+            <button type="button" onclick="dismissPoliticsDraft()" class="btn-tactile px-2 py-1 rounded-lg font-medium bg-white border border-amber-200 text-amber-800 hover:bg-amber-100">丢弃</button>
+          </div>
+        </div>
+        <input type="hidden" id="pol-id" />
+
+        <!-- 双形态切换：选择题错题 / 纯知识点 -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200/80">
+          <button type="button" id="pol-kind-btn-choice" onclick="switchPoliticsModalKind('choice')" class="btn-tactile flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 text-white shadow-xs">☑️ 选择题错题（单选 / 多选）</button>
+          <button type="button" id="pol-kind-btn-knowledge" onclick="switchPoliticsModalKind('knowledge')" class="btn-tactile flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100">📝 纯知识点卡片（帽子题 / 时间轴）</button>
+        </div>
+
+        <!-- 科目 / 错因 / 来源 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">政治科目</label>
+            <select id="pol-subject" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">错因 / 分类</label>
+            <select id="pol-error-reason" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">题目来源</label>
+            <input type="text" id="pol-source" list="pol-source-presets" placeholder="如：肖1000 / 肖八 / 苍盾"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none" />
+            <datalist id="pol-source-presets">
+              <option value="肖1000"></option>
+              <option value="肖八"></option>
+              <option value="肖四"></option>
+              <option value="腿四"></option>
+              <option value="徐涛优题库"></option>
+              <option value="苍盾小程序"></option>
+              <option value="历年真题"></option>
+              <option value="背诵手册"></option>
+              <option value="冲刺笔记"></option>
+            </datalist>
+          </div>
+        </div>
+
+        <!-- 选择题专属录入区 -->
+        <div id="pol-choice-fields" class="space-y-4">
+          <!-- 一键智能粘贴拆题 -->
+          <div class="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/80 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs font-bold text-rose-800">⚡ 智能粘贴拆题（直接粘贴刷题小程序整段题目，自动拆分题干 / A~D 选项 / 答案 / 正确率）</span>
+              <button type="button" onclick="parsePoliticsSmartPaste()" class="btn-tactile px-3 py-1 rounded-lg text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-xs">✨ 智能拆分填入</button>
+            </div>
+            <textarea id="pol-smart-paste" rows="3" placeholder="示例：直接粘贴题干 + A/B/C/D 选项 + 你的答案 B + 正确答案 D + 全站正确率 53% + 答案解析..."
+              class="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs leading-relaxed focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none resize-y"></textarea>
+          </div>
+
+          <!-- 题型 + 全站正确率 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5">题型</label>
+              <select id="pol-qtype" onchange="onPoliticsQTypeChange()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 outline-none">
+                <option value="single">🔘 单选题</option>
+                <option value="multi">☑️ 多选题</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5">全站正确率 / 难度（可选）</label>
+              <input type="text" id="pol-site-accuracy" placeholder="例如：53%"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 outline-none" />
+            </div>
+          </div>
+
+          <!-- 题干 -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">题干内容 *</label>
+            <textarea id="pol-stem" rows="3" placeholder="输入或粘贴选择题题干（支持保留 ①②③④ 组合项）..."
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm leading-relaxed focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none resize-y"></textarea>
+          </div>
+
+          <!-- 选项与正/错选快捷标定 -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-semibold text-slate-500">选项（点击右侧按钮一键标定「✓ 正解」与「✗ 错选」）</label>
+              <button type="button" onclick="addPoliticsOptionRow()" class="btn-tactile px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">＋ 加选项</button>
+            </div>
+            <div id="pol-options-container" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- 考点标题 / 知识点标题 -->
+        <div>
+          <label id="pol-topic-label" class="block text-xs font-semibold text-slate-500 mb-1.5">核心考点摘要（可选，留空自动提取题干首句）</label>
+          <input type="text" id="pol-topic" placeholder="例如：马克思主义中国化时代化理论成果的共同点"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none" />
+        </div>
+
+        <!-- 状态 / 遗忘次数 / 日期 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">当前状态</label>
+            <select id="pol-status" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 outline-none">
+              <option value="待解决">待解决</option>
+              <option value="复习中">复习中</option>
+              <option value="已掌握">已掌握</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">遗忘次数</label>
+            <input type="number" min="1" id="pol-forgetCount" value="1"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">最近日期</label>
+            <input type="date" id="pol-date"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-rose-500 outline-none" />
+          </div>
+        </div>
+
+        <!-- 原题截图（可选，独立存于 assets/，不膨胀 JSON） -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">原题截图（可选 · 独立存于 <code class="font-mono text-[11px] px-1 rounded bg-slate-100">assets/</code>，不塞入 JSON）</label>
+          <input type="file" id="pol-image-file-input" accept="image/*" class="hidden" onchange="onPoliticsImageFileChange(event)" />
+          <div id="pol-image-empty-wrap" ondragover="event.preventDefault()" ondrop="onPoliticsImageDrop(event)" onclick="document.getElementById('pol-image-file-input').click()"
+            class="cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50/70 hover:border-rose-400 hover:bg-rose-50/30 transition-colors p-3.5 text-center">
+            <div class="text-xs font-semibold text-slate-600">🖼️ 点击选择图片、拖入图片，或在弹窗打开时直接按 <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[11px]">Ctrl+V</kbd> 粘贴截图</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">自动压缩为轻量 WebP 存入独立图片仓库</div>
+          </div>
+          <div id="pol-image-preview-wrap" class="hidden flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-slate-50/80">
+            <img id="pol-image-preview" alt="截图预览" class="w-20 h-16 object-cover rounded-lg border border-slate-200 bg-white shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div id="pol-image-info" class="text-xs font-semibold text-slate-700 truncate"></div>
+              <div class="text-[11px] text-slate-400 mt-0.5">可再次 Ctrl+V 替换截图</div>
+            </div>
+            <button type="button" onclick="document.getElementById('pol-image-file-input').click()" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 shrink-0">更换</button>
+            <button type="button" onclick="clearPoliticsDraftImage()" class="btn-tactile px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 shrink-0">移除</button>
+          </div>
+        </div>
+
+        <!-- 答案解析 / 知识点笔记（Markdown 分屏实时渲染） -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold text-slate-500">
+              <span id="pol-analysis-label">答案解析 / 避坑笔记</span>
+              <span class="ml-1 align-middle text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-md">Markdown</span>
+            </label>
+            <div class="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+              <button type="button" id="pol-note-tab-edit" onclick="polNoteSwitchTab('edit')" class="md-tab-btn">✍️ 编辑</button>
+              <button type="button" id="pol-note-tab-split" onclick="polNoteSwitchTab('split')" class="md-tab-btn">⇔ 分屏</button>
+              <button type="button" id="pol-note-tab-preview" onclick="polNoteSwitchTab('preview')" class="md-tab-btn">👁️ 预览</button>
+              <button type="button" id="pol-note-fullscreen-btn" onclick="toggleModalEditorFullscreen('politicsModalPanel','pol-note-fullscreen-btn')" class="md-tab-btn" title="放大写作空间">⛶ 放大</button>
+            </div>
+          </div>
+          <div id="pol-note-toolbar" class="flex flex-wrap items-center gap-1 mb-2.5">
+            <button type="button" onclick="polNoteWrapSel('**','**','关键词')" title="加粗 (Ctrl+B)" class="md-tool font-bold">B</button>
+            <button type="button" onclick="polNoteWrapSel('*','*','斜体')" title="斜体 (Ctrl+I)" class="md-tool italic font-serif">I</button>
+            <button type="button" onclick="polNoteWrapSel('==','==','重点考点')" title="荧光高亮 ==文字==（Ctrl+H）" class="md-tool md-tool-mark">高亮</button>
+            <button type="button" onclick="polNotePrefixLines('## ')" title="标题" class="md-tool font-bold">H</button>
+            <button type="button" onclick="polNotePrefixLines('- ')" title="无序列表" class="md-tool">• 列表</button>
+            <button type="button" onclick="polNotePrefixLines('', true)" title="有序列表" class="md-tool">1. 序号</button>
+            <button type="button" onclick="polNotePrefixLines('> ')" title="引用" class="md-tool">❝ 引用</button>
+            <button type="button" onclick="polNoteInsert('\n> [!WARN] 易错避坑\n> 写下易混干扰项或时间线陷阱...\n')" title="插入避坑框" class="md-tool">⚠️ 避坑框</button>
+            <button type="button" onclick="polNoteInsert('\n| 概念 / 会议 | 核心定位 / 帽子 | 易混点 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n')" title="插入对比表格" class="md-tool">▦ 对比表</button>
+            <span class="w-px h-4 bg-slate-200 mx-0.5"></span>
+            <button type="button" onclick="openMathStudio('pol-analysis','formula')" title="打开公式编辑器" class="md-tool md-tool-accent">∫ 公式</button>
+            <button type="button" onclick="openMathStudio('pol-analysis','symbols')" title="LaTeX 符号中文俗称速查" class="md-tool md-tool-accent">📖 符号</button>
+          </div>
+          <div id="pol-note-flex" class="rec-note-flex">
+            <textarea id="pol-analysis" rows="10" onkeydown="polNoteKeydown(event)" oninput="polNoteLivePreview()" placeholder="记录为什么选错、干扰项怎么排除、核心帽子词/时间线对比...&#10;支持：==高亮==、**加粗**、- 列表、> [!WARN] 避坑框、对比表格"
+              class="rec-note-ta w-full px-4 py-3 rounded-xl border border-slate-200 text-sm leading-relaxed focus:border-rose-500 focus:ring-2 focus:ring-rose-500/15 outline-none resize-y"></textarea>
+            <div id="pol-analysis-preview" class="hidden md-body rec-note-pv w-full px-5 py-4 rounded-xl border border-slate-200 bg-slate-50/60 text-sm text-slate-700 overflow-y-auto"></div>
+          </div>
+        </div>
+
+        <div id="pol-forget-history-wrap" class="hidden">
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">遗忘轨迹（每次 +1 自动记录时间）</label>
+          <div id="pol-forget-history" class="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/70 text-xs text-slate-600 space-y-1 max-h-36 overflow-y-auto"></div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex justify-end gap-2.5">
+        <button onclick="closePoliticsModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+        <button onclick="savePoliticsModal()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 shadow-sm">保存记录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 9: 考研政治 · 卡片详情查看（FLIP 动画） ==================== -->
+  <div id="politicsViewerModal" class="modal-backdrop" onclick="if(event.target===this) closePoliticsViewer()">
+    <div id="politicsViewerPanel" class="viewer-panel bg-white rounded-2xl w-full max-w-5xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 sm:px-8 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <h3 class="text-base font-bold text-slate-900">📕 政治错题 / 知识点详情</h3>
+        <button onclick="closePoliticsViewer()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div id="politicsViewerBody" class="p-7 sm:p-9 space-y-6 max-h-[82vh] overflow-y-auto"></div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2.5">
+        <button id="politicsViewerForgetBtn" class="btn-tactile px-4 py-2 rounded-xl text-sm font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white">⚡ +1 遗忘</button>
+        <div class="flex gap-2.5">
+          <button onclick="closePoliticsViewer()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">关闭</button>
+          <button id="politicsViewerEditBtn" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 shadow-sm">✏️ 编辑此记录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 10: 原题截图全屏灯箱 ==================== -->
+  <div id="politicsLightbox" class="modal-backdrop" style="z-index:160;" onclick="closePoliticsLightbox()">
+    <div class="relative max-w-[92vw] max-h-[90vh] flex flex-col items-center gap-2" onclick="event.stopPropagation()">
+      <img id="politicsLightboxImg" alt="原题大图" class="max-w-[92vw] max-h-[84vh] rounded-2xl shadow-2xl bg-white border border-white/20 object-contain" />
+      <button onclick="closePoliticsLightbox()" class="btn-tactile px-4 py-1.5 rounded-full text-xs font-semibold bg-white/90 text-slate-800 hover:bg-white shadow">✕ 关闭预览 (Esc)</button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 11: 分模块存储中心（v5） ==================== -->
+  <div id="storageModal" class="modal-backdrop" onclick="if(event.target===this) closeStorageModal()">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">🗄️ 分模块存储中心（v5 分散存储架构）</h3>
+          <p class="text-xs text-slate-500 mt-0.5">六大业务模块与原题截图各自独立落盘，改哪块写哪块；100% 兼容旧版单文件 JSON 自动拆分迁移</p>
+        </div>
+        <button onclick="closeStorageModal()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700">✕</button>
+      </div>
+      <div id="storageModalBody" class="p-6 space-y-4 max-h-[76vh] overflow-y-auto bg-slate-50/35"></div>
+      <div class="px-6 py-3.5 border-t border-slate-100 bg-white flex items-center justify-between">
+        <span class="text-xs text-slate-400">IndexedDB v2 (KaoyanTrackerDB / modules + assets) · 独立 localStorage 镜像</span>
+        <button onclick="closeStorageModal()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 英语阅读：选中文字后的浮动工具栏 -->
+  <div id="readingToolbar" class="hidden rd-toolbar" onmousedown="event.preventDefault()"></div>
+
+  <!-- ==================== MODAL 12: 公式编辑器 / 矩阵生成器 / LaTeX 符号俗称 ==================== -->
+  <div id="mathStudioModal" class="modal-backdrop" style="z-index:150;" onclick="if(event.target===this) closeMathStudio()">
+    <div class="modal-panel bg-white rounded-2xl w-full max-w-5xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/75">
+        <div class="flex flex-wrap items-center gap-3">
+          <h3 class="text-base font-bold text-slate-900">∑ 公式 & 矩阵工作台</h3>
+          <div class="inline-flex items-center gap-1 p-1 rounded-xl bg-slate-200/70">
+            <button type="button" id="ms-tab-btn-formula" onclick="mathStudioSwitchTab('formula')" class="ms-tab-btn ms-tab-active">∫ 公式编辑器</button>
+            <button type="button" id="ms-tab-btn-matrix" onclick="mathStudioSwitchTab('matrix')" class="ms-tab-btn">⊞ 矩阵生成器</button>
+            <button type="button" id="ms-tab-btn-symbols" onclick="mathStudioSwitchTab('symbols')" class="ms-tab-btn">📖 LaTeX 符号俗称表</button>
+          </div>
+        </div>
+        <button type="button" onclick="closeMathStudio()" class="btn-tactile w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200/70 hover:text-slate-700" title="关闭 (Esc)">✕</button>
+      </div>
+
+      <div class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+        <!-- 原位重编提示 -->
+        <div id="ms-replace-banner" class="hidden flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800">
+          <span class="font-semibold">✏️ 已自动载入光标所在公式，确认后将原位替换</span>
+          <button type="button" onclick="clearMathStudioReplaceMode()" class="btn-tactile px-2.5 py-1 rounded-lg font-semibold bg-white border border-blue-200 text-blue-700 hover:bg-blue-100">改为在光标处新插</button>
+        </div>
+
+        <!-- TAB 1: 公式编辑器 -->
+        <div id="ms-pane-formula" class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="inline-flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 border border-slate-200/70">
+              <button type="button" id="ms-mode-inline" onclick="setMathStudioDisplayMode(false)" class="md-tab-btn">行内公式 $...$</button>
+              <button type="button" id="ms-mode-block" onclick="setMathStudioDisplayMode(true)" class="md-tab-btn">独立居中块 $$...$$</button>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="ms-formula-status" class="text-[11px] font-medium text-slate-400">行内公式 $...$</span>
+              <button type="button" onclick="copyMathStudioFormula()" class="btn-tactile px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">📋 复制源码</button>
+              <button type="button" onclick="clearMathStudioFormula()" class="btn-tactile px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100">清空</button>
+            </div>
+          </div>
+
+          <div id="ms-formula-preview" class="ms-preview-box"></div>
+
+          <div>
+            <div class="text-xs font-semibold text-slate-500 mb-1.5">常用数学结构（点击即插，按 <kbd class="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px]">Tab</kbd> 跳到下一对大括号）</div>
+            <div id="ms-formula-snippets" class="flex flex-wrap gap-1.5"></div>
+          </div>
+
+          <div>
+            <textarea id="ms-tex-input" rows="4" oninput="refreshMathStudioFormulaPreview()" onkeydown="handleMathInputKeydown(event)"
+              placeholder="输入 LaTeX 公式内容（无需再写外层 $ ），例如：\int_0^{+\infty} e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}&#10;按 Ctrl+Enter 快速插入卡片"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 font-mono text-sm leading-relaxed focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none resize-y"></textarea>
+          </div>
+
+          <div>
+            <div class="text-xs font-semibold text-slate-500 mb-1.5">考研高频模板（一键套用）</div>
+            <div id="ms-formula-templates" class="flex flex-wrap gap-1.5"></div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <button type="button" onclick="mathStudioSwitchTab('symbols'); setMathStudioSymTarget('formula');" class="btn-tactile px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100">📖 查中文俗称符号拼接进来</button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="closeMathStudio()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+              <button type="button" onclick="applyMathStudioFormulaToCard()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">✅ 插入卡片备注 (Ctrl+Enter)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: 可视化矩阵生成器 -->
+        <div id="ms-pane-matrix" class="hidden space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2.5 bg-slate-50/90 border border-slate-200/80 rounded-xl p-3">
+            <div class="flex flex-wrap items-center gap-1 bg-white p-1 rounded-xl border border-slate-200/80">
+              <button type="button" data-ms-mtype="pmatrix" onclick="setMatrixType('pmatrix')" class="md-tab-btn">( ) 圆括号</button>
+              <button type="button" data-ms-mtype="bmatrix" onclick="setMatrixType('bmatrix')" class="md-tab-btn">[ ] 方括号</button>
+              <button type="button" data-ms-mtype="vmatrix" onclick="setMatrixType('vmatrix')" class="md-tab-btn">| | 行列式</button>
+              <button type="button" data-ms-mtype="augmented" onclick="setMatrixType('augmented')" class="md-tab-btn">[A|b] 增广阵</button>
+              <button type="button" data-ms-mtype="cases" onclick="setMatrixType('cases')" class="md-tab-btn">{ 分段/方程组</button>
+              <button type="button" data-ms-mtype="matrix" onclick="setMatrixType('matrix')" class="md-tab-btn">无括号</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <div class="inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                <span class="text-slate-500 font-semibold">行</span>
+                <button type="button" onclick="stepMatrixSize(-1, 0)" class="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 font-bold">-</button>
+                <button type="button" onclick="stepMatrixSize(1, 0)" class="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 font-bold">+</button>
+              </div>
+              <div id="ms-col-stepper" class="inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                <span class="text-slate-500 font-semibold">列</span>
+                <button type="button" onclick="stepMatrixSize(0, -1)" class="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 font-bold">-</button>
+                <button type="button" onclick="stepMatrixSize(0, 1)" class="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 font-bold">+</button>
+              </div>
+              <span id="ms-matrix-dim" class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold">3 × 3</span>
+              <div id="ms-aug-col-ctrl" class="hidden inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-indigo-200">
+                <span class="text-indigo-700 font-semibold">竖线</span>
+                <button type="button" onclick="stepAugCol(-1)" class="w-5 h-5 rounded bg-indigo-50 hover:bg-indigo-100 font-bold text-indigo-700">←</button>
+                <span id="ms-aug-col-val" class="text-indigo-700 font-semibold">第 2 列后</span>
+                <button type="button" onclick="stepAugCol(1)" class="w-5 h-5 rounded bg-indigo-50 hover:bg-indigo-100 font-bold text-indigo-700">→</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-xs font-semibold text-slate-500 mr-1">快捷填充：</span>
+            <button type="button" onclick="fillMatrixPreset('identity')" class="md-tool">单位阵 E</button>
+            <button type="button" onclick="fillMatrixPreset('diag')" class="md-tool">对角阵 diag(λ)</button>
+            <button type="button" onclick="fillMatrixPreset('zero')" class="md-tool">零矩阵</button>
+            <button type="button" onclick="fillMatrixPreset('indexed')" class="md-tool">通用下标 a_ij</button>
+            <button type="button" onclick="fillMatrixPreset('dots')" class="md-tool">带省略号矩阵</button>
+            <button type="button" onclick="fillMatrixPreset('transpose')" class="md-tool">⇄ 转置行列</button>
+            <button type="button" onclick="fillMatrixPreset('clear')" class="md-tool text-rose-600">清空格子</button>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <div class="lg:col-span-7 space-y-3">
+              <div class="text-xs text-slate-500">像 Excel 一样填格子（支持 <kbd class="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px]">Tab</kbd> / <kbd class="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px]">Enter</kbd> / 方向键移动，也可填 <code class="px-1 bg-slate-100 rounded">\frac{1}{2}</code>）：</div>
+              <div id="ms-matrix-grid" class="ms-matrix-grid"></div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-slate-600">⚡ 纯文本秒转矩阵（空格或逗号分隔列，回车换行）</span>
+                  <button type="button" onclick="parseQuickTextToMatrix()" class="btn-tactile px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700">填入格子</button>
+                </div>
+                <textarea id="ms-matrix-paste" rows="2" placeholder="例如：&#10;1 2 -1&#10;0 3 4"
+                  class="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-xs focus:border-indigo-500 outline-none resize-y"></textarea>
+              </div>
+            </div>
+            <div class="lg:col-span-5 space-y-2.5">
+              <div class="text-xs font-semibold text-slate-500">实时渲染预览：</div>
+              <div id="ms-matrix-preview" class="ms-preview-box min-h-[10rem]"></div>
+              <pre id="ms-matrix-code" class="p-2.5 rounded-xl bg-slate-900 text-slate-200 text-[11px] font-mono overflow-x-auto max-h-32"></pre>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <button type="button" onclick="sendMatrixToFormulaEditor()" class="btn-tactile px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100">∫ 带入公式编辑器继续拼接（如 A = 矩阵）</button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="closeMathStudio()" class="btn-tactile px-4 py-2 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">取消</button>
+              <button type="button" onclick="insertMatrixToCard()" class="btn-tactile px-5 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">✅ 直接插入卡片</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: LaTeX 符号「中文俗称」速查表 -->
+        <div id="ms-pane-symbols" class="hidden space-y-3.5">
+          <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <div class="relative flex-1 min-w-[220px]">
+              <input type="text" id="ms-sym-search" oninput="onMathStudioSymSearch(this.value)"
+                placeholder="搜中文俗称 / 读音 / 代码，如：约等于、阿尔法、偏导、拔、异或、属于、向上取整..."
+                class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none" />
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+            </div>
+            <div class="inline-flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 border border-slate-200/70">
+              <button type="button" id="ms-sym-target-card" onclick="setMathStudioSymTarget('card')" class="md-tab-btn" title="自动识别是否需要补 $...$ 后直接插进卡片">直接插进卡片</button>
+              <button type="button" id="ms-sym-target-formula" onclick="setMathStudioSymTarget('formula')" class="md-tab-btn" title="连续拼接多个符号到公式编辑器">拼接到公式框</button>
+            </div>
+          </div>
+
+          <div id="ms-sym-cats" class="flex flex-wrap gap-1.5"></div>
+          <div id="ms-sym-grid" class="ms-sym-grid"></div>
+
+          <div id="ms-sym-formula-bar" class="hidden pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-indigo-50/50 rounded-xl px-3.5 py-2.5">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <span class="text-xs font-semibold text-indigo-700 shrink-0">当前拼接：</span>
+              <div id="ms-sym-mini-preview" class="text-sm overflow-x-auto"></div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" onclick="mathStudioSwitchTab('formula')" class="btn-tactile px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50">去公式框精修</button>
+              <button type="button" onclick="applyMathStudioFormulaToCard()" class="btn-tactile px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700">✅ 插入卡片</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -659,6 +1449,7 @@
   <script src="js/utils/common.js"></script>
   <script src="js/utils/markdown.js"></script>
   <script src="js/ui/record-note.js"></script>
+  <script src="js/ui/math-studio.js"></script>
   <script src="js/ui/feedback.js"></script>
   <script src="js/features/record-helpers.js"></script>
   <script src="js/data/normalize.js"></script>
@@ -666,9 +1457,12 @@
   <script src="js/storage/snapshot-ui.js"></script>
   <script src="js/ui/tabs.js"></script>
   <script src="js/features/records.js"></script>
+  <script src="js/features/politics.js"></script>
   <script src="js/features/todos.js"></script>
   <script src="js/features/papers.js"></script>
   <script src="js/features/stats.js"></script>
+  <script src="js/features/reading-pdf.js"></script>
+  <script src="js/features/reading.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

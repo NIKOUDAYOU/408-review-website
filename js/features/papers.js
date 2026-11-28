@@ -231,13 +231,15 @@ function editPaperFromDetail() {
 }
 
 
-// 渲染套卷页：统计卡 + 筛选后的套卷列表（平均分图表已移到「统计」页）
+// 渲染套卷页：统计卡 + 筛选后的套卷列表 + 分页（平均分图表已移到「统计」页）
 function renderPapers() {
   populatePaperCatFilter();
   renderPaperStats();
   const list = getFilteredPapers();
   const container = document.getElementById('papers-container');
+  const pagEl = document.getElementById('pagination-papers');
   if (!list.length) {
+    if (pagEl) pagEl.innerHTML = '';
     container.innerHTML = `
       <div class="bg-white/95 border border-slate-200/80 rounded-2xl p-14 text-center shadow-sm">
         <div class="text-4xl mb-3">📭</div>
@@ -246,9 +248,33 @@ function renderPapers() {
       </div>`;
     return;
   }
-  container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${list.map((p, idx) => paperCardHtml(p, idx)).join('')}</div>`;
+  const ps = pageState.papers;
+  const totalPages = Math.max(1, Math.ceil(list.length / ps.size));
+  ps.page = Math.min(Math.max(1, ps.page), totalPages);
+  const start = (ps.page - 1) * ps.size;
+  const pageList = list.slice(start, start + ps.size);
+  if (pagEl) renderPaginationBar('papers', list.length, totalPages, pagEl);
+  container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${pageList.map((p, idx) => paperCardHtml(p, idx)).join('')}</div>`;
 }
 
+
+let paperModalInitialSnap = '';
+
+function getPaperModalSnapshot() {
+  return JSON.stringify({
+    id: document.getElementById('paper-id').value,
+    mod: document.getElementById('paper-mod').value,
+    name: document.getElementById('paper-name').value,
+    cat: document.getElementById('paper-category').value,
+    series: document.getElementById('paper-series').value,
+    small: document.getElementById('paper-small').value,
+    big: document.getElementById('paper-big').value,
+    time: document.getElementById('paper-time').value,
+    date: document.getElementById('paper-date').value,
+    note: document.getElementById('paper-note').value,
+    errors: paperDraftErrors
+  });
+}
 
 // 打开“新增/编辑套卷”弹窗
 function openPaperModal(id = '') {
@@ -284,14 +310,21 @@ function openPaperModal(id = '') {
   }
   renderPaperErrorRows();
   updatePaperSeriesVisibility(); // 按科目+分类决定是否显示系列输入
+  paperModalInitialSnap = getPaperModalSnapshot();
   document.getElementById('paperModal').classList.add('open');
   setTimeout(() => document.getElementById('paper-name').focus(), 100);
 }
 
 
-// 关闭套卷编辑弹窗
-function closePaperModal() {
-  document.getElementById('paperModal').classList.remove('open');
+// 关闭套卷编辑弹窗（有未保存改动时二次确认）
+async function closePaperModal(force = false) {
+  const modal = document.getElementById('paperModal');
+  if (!modal || !modal.classList.contains('open')) return;
+  if (!force && getPaperModalSnapshot() !== paperModalInitialSnap) {
+    const ok = await confirmDiscardEdits('套卷编辑');
+    if (!ok) return;
+  }
+  modal.classList.remove('open');
 }
 
 
@@ -409,9 +442,10 @@ async function savePaperModal() {
     if (p) Object.assign(p, data);
   } else {
     appData.papers.unshift({ id: genId('paper'), ...data, createdAt: Date.now() });
+    pageState.papers.page = 1;
   }
-  closePaperModal();
-  await persistData(true);
+  await closePaperModal(true);
+  await persistModule('papers', true);
   renderPapers();
   updateTabCounts();
   showToast(id ? '已更新套卷' : '已添加套卷', 'success');
@@ -431,7 +465,7 @@ async function deletePaper(id) {
   if (!ok) return;
   await createSnapshot('删除套卷前备份');
   appData.papers = appData.papers.filter(x => x.id !== id);
-  await persistData(true);
+  await persistModule('papers', true);
   renderPapers();
   updateTabCounts();
   showToast('已删除套卷（可通过历史快照恢复）', 'info');
@@ -463,7 +497,7 @@ async function pushErrorToTracker(paperId, errId) {
     createdAt: Date.now()
   });
   err.addedToTracker = true;
-  await persistData(true);
+  await persistModules(['papers', mod], true);
   renderRecords(mod);
   renderPapers();
   if (currentPaperDetailId === paperId) openPaperDetail(paperId);

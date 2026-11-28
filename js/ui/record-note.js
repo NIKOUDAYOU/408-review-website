@@ -84,8 +84,8 @@ function buildViewerHtml(mod, rec) {
       </div>
     </div>
     <div>
-      <div class="text-xs font-semibold text-slate-500 mb-2">备注 / 反思（Markdown 渲染）</div>
-      <div class="md-body text-sm text-slate-700 bg-slate-50/90 border border-slate-200/70 rounded-xl px-4 py-3.5 min-h-[6rem]">
+      <div class="text-xs font-semibold text-slate-500 mb-2.5">备注 / 反思（Markdown 渲染）</div>
+      <div class="md-body text-sm text-slate-700 bg-slate-50/75 border border-slate-200/75 rounded-2xl px-6 sm:px-8 py-5 sm:py-6 min-h-[16rem]">
         ${rec.note ? renderMarkdown(rec.note) : '<p class="md-p text-slate-400 italic">（暂无备注，点击下方「编辑此记录」补充...）</p>'}
       </div>
     </div>
@@ -94,13 +94,30 @@ function buildViewerHtml(mod, rec) {
 }
 
 
-// 检测卡片/紧凑表格备注是否超出默认预览高度，控制渐变遮罩与「点击查看详情」提示
+// 精准判断容器内实际文本是否被裁切（避免底部留白或亚像素误差误触发渐变遮罩与「点击查看详情」）
+function isNoteActuallyClipped(el) {
+  if (!el || !el.clientHeight) return false;
+  const body = el.querySelector('.md-body');
+  if (body) {
+    const boxRect = el.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    // 只有当实际渲染文本的底部真正超出容器可见底边（保留 2px 亚像素容差）时才算截断
+    return bodyRect.bottom > boxRect.bottom - 2;
+  }
+  return el.scrollHeight > el.clientHeight + 4;
+}
+
+// 检测卡片/紧凑表格备注是否超出当前可见高度，控制渐变遮罩与「点击查看详情」提示
 function markNoteOverflows(root = document) {
   if (!root || !root.querySelectorAll) return;
-  root.querySelectorAll('.k-card-note, .tbl-note-preview').forEach(el => {
-    if (!el.clientHeight) return;
-    el.classList.toggle('is-overflow', el.scrollHeight > el.clientHeight + 1);
-  });
+  const measure = () => {
+    root.querySelectorAll('.k-card-note, .tbl-note-preview').forEach(el => {
+      if (!el.clientHeight) return;
+      el.classList.toggle('is-overflow', isNoteActuallyClipped(el));
+    });
+  };
+  measure();
+  requestAnimationFrame(measure);
 }
 
 let noteOverflowResizeTimer = null;
@@ -108,6 +125,19 @@ window.addEventListener('resize', () => {
   clearTimeout(noteOverflowResizeTimer);
   noteOverflowResizeTimer = setTimeout(() => markNoteOverflows(document), 120);
 });
+
+// 字体异步加载完成或切换字体预设（楷体/宋体/黑体）后，自动重测溢出状态
+if (document.fonts) {
+  document.fonts.ready.then(() => markNoteOverflows(document));
+  if (typeof document.fonts.addEventListener === 'function') {
+    document.fonts.addEventListener('loadingdone', () => markNoteOverflows(document));
+  }
+}
+if (typeof MutationObserver === 'function' && document.body) {
+  new MutationObserver(() => {
+    requestAnimationFrame(() => markNoteOverflows(document));
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+}
 
 // 打开放大查看弹窗，大卡片使用 FLIP 从卡片位置平滑放大，表格行使用居中缩放淡入
 function openRecordViewer(mod, id, cardEl) {
@@ -192,29 +222,46 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && viewerCtx && !viewerCtx.closing) closeRecordViewer();
 });
 
-// 用 before/after 包裹选区（无选区时插入 placeholder）
-function recNoteWrapSel(before, after, placeholder) {
-  const ta = document.getElementById('rec-note');
+// ---------- 通用 Markdown 文本域编辑增强（支持 Ctrl+Z 撤回、智能续行、缩进、成对包裹） ----------
+function mdEditorReplaceRange(ta, start, end, text, selStart = start + text.length, selEnd = selStart, onAfter = null) {
+  if (!ta) return;
+  ta.focus();
+  ta.setSelectionRange(start, end);
+  const beforeLen = ta.value.length;
+  const beforeSlice = ta.value.slice(start, end);
+  let replacedByCommand = false;
+  try {
+    if (typeof document.execCommand === 'function') {
+      replacedByCommand = document.execCommand('insertText', false, text);
+    }
+  } catch (_) {
+    replacedByCommand = false;
+  }
+  const expectedLen = beforeLen - beforeSlice.length + text.length;
+  if (!replacedByCommand || ta.value.length !== expectedLen) {
+    ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  }
+  ta.setSelectionRange(selStart, selEnd);
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  if (typeof onAfter === 'function') onAfter();
+}
+
+function mdEditorWrapSel(ta, before, after, placeholder, onAfter = null) {
+  if (!ta) return;
   const s = ta.selectionStart, e = ta.selectionEnd;
   const sel = ta.value.slice(s, e) || placeholder || '';
-  ta.value = ta.value.slice(0, s) + before + sel + after + ta.value.slice(e);
-  ta.focus();
-  ta.selectionStart = s + before.length;
-  ta.selectionEnd = s + before.length + sel.length;
+  const inserted = before + sel + after;
+  mdEditorReplaceRange(ta, s, e, inserted, s + before.length, s + before.length + sel.length, onAfter);
 }
 
-// 在光标处插入文本
-function recNoteInsert(text) {
-  const ta = document.getElementById('rec-note');
+function mdEditorInsert(ta, text, onAfter = null) {
+  if (!ta) return;
   const s = ta.selectionStart, e = ta.selectionEnd;
-  ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
-  ta.focus();
-  ta.selectionStart = ta.selectionEnd = s + text.length;
+  mdEditorReplaceRange(ta, s, e, text, s + text.length, s + text.length, onAfter);
 }
 
-// 给选区内每行加前缀（标题 / 列表 / 引用）；autoNum=true 时生成 1. 2. 3.
-function recNotePrefixLines(prefix, autoNum) {
-  const ta = document.getElementById('rec-note');
+function mdEditorPrefixLines(ta, prefix, autoNum = false, onAfter = null) {
+  if (!ta) return;
   const s = ta.selectionStart, e = ta.selectionEnd;
   const v = ta.value;
   const ls = v.lastIndexOf('\n', s - 1) + 1;
@@ -227,22 +274,170 @@ function recNotePrefixLines(prefix, autoNum) {
     return stripped.startsWith(p) ? stripped : p + stripped;
   });
   const block = patched.join('\n');
-  ta.value = v.slice(0, ls) + block + v.slice(le);
-  ta.focus();
-  ta.selectionStart = ls;
-  ta.selectionEnd = ls + block.length;
+  mdEditorReplaceRange(ta, ls, le, block, ls, ls + block.length, onAfter);
 }
 
-// 备注编辑区快捷键：Ctrl+B 加粗 / Ctrl+I 斜体 / Tab 缩进
-function recNoteKeydown(e) {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'b' || e.key === 'B')) {
-    e.preventDefault();
-    recNoteWrapSel('**', '**', '加粗文字');
-  } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'i' || e.key === 'I')) {
-    e.preventDefault();
-    recNoteWrapSel('*', '*', '斜体文字');
-  } else if (e.key === 'Tab') {
-    e.preventDefault();
-    recNoteInsert('  ');
+function mdEditorHandleIndent(ta, shiftKey, onAfter = null) {
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  const v = ta.value;
+  if (s === e && !shiftKey) {
+    mdEditorReplaceRange(ta, s, e, '  ', s + 2, s + 2, onAfter);
+    return;
   }
+  const ls = v.lastIndexOf('\n', s - 1) + 1;
+  let le = v.indexOf('\n', e);
+  if (le === -1) le = v.length;
+  const lines = v.slice(ls, le).split('\n');
+  const patched = lines.map(ln => {
+    if (shiftKey) {
+      if (ln.startsWith('  ')) return ln.slice(2);
+      if (ln.startsWith('\t') || ln.startsWith(' ')) return ln.slice(1);
+      return ln;
+    }
+    return '  ' + ln;
+  });
+  const block = patched.join('\n');
+  mdEditorReplaceRange(ta, ls, le, block, ls, ls + block.length, onAfter);
+}
+
+function mdEditorHandleSmartEnter(e, ta, onAfter = null) {
+  if (e.isComposing || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return false;
+  const s = ta.selectionStart, end = ta.selectionEnd;
+  if (s !== end) return false;
+  const v = ta.value;
+  const ls = v.lastIndexOf('\n', s - 1) + 1;
+  const beforeCursor = v.slice(ls, s);
+  const restOfLineEnd = v.indexOf('\n', s);
+  const restOfLine = restOfLineEnd === -1 ? v.slice(s) : v.slice(s, restOfLineEnd);
+
+  // 任务清单: - [ ] / - [x]
+  let m = beforeCursor.match(/^(\s*)([-*+])\s+\[[ xX]\]\s*(.*)$/);
+  if (m) {
+    e.preventDefault();
+    if (!m[3] && !restOfLine.trim()) {
+      mdEditorReplaceRange(ta, ls, s, '', ls, ls, onAfter);
+    } else {
+      const next = `\n${m[1]}${m[2]} [ ] `;
+      mdEditorReplaceRange(ta, s, s, next, s + next.length, s + next.length, onAfter);
+    }
+    return true;
+  }
+  // 无序列表: - / * / +
+  m = beforeCursor.match(/^(\s*)([-*+])\s+(.*)$/);
+  if (m) {
+    e.preventDefault();
+    if (!m[3] && !restOfLine.trim()) {
+      mdEditorReplaceRange(ta, ls, s, '', ls, ls, onAfter);
+    } else {
+      const next = `\n${m[1]}${m[2]} `;
+      mdEditorReplaceRange(ta, s, s, next, s + next.length, s + next.length, onAfter);
+    }
+    return true;
+  }
+  // 有序列表: 1. / 2)
+  m = beforeCursor.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+  if (m) {
+    e.preventDefault();
+    if (!m[4] && !restOfLine.trim()) {
+      mdEditorReplaceRange(ta, ls, s, '', ls, ls, onAfter);
+    } else {
+      const next = `\n${m[1]}${Number(m[2]) + 1}${m[3]} `;
+      mdEditorReplaceRange(ta, s, s, next, s + next.length, s + next.length, onAfter);
+    }
+    return true;
+  }
+  // 引用块: >
+  m = beforeCursor.match(/^(\s*&?>\s?)(.*)$/);
+  if (m && /^(\s*>\s?)(.*)$/.test(beforeCursor)) {
+    const qm = beforeCursor.match(/^(\s*>\s?)(.*)$/);
+    e.preventDefault();
+    if (!qm[2] && !restOfLine.trim()) {
+      mdEditorReplaceRange(ta, ls, s, '', ls, ls, onAfter);
+    } else {
+      const next = `\n${qm[1]}`;
+      mdEditorReplaceRange(ta, s, s, next, s + next.length, s + next.length, onAfter);
+    }
+    return true;
+  }
+  return false;
+}
+
+function mdEditorHandleKeydown(e, ta, onAfter = null) {
+  if (!ta) return;
+  const mod = e.ctrlKey || e.metaKey;
+  const k = (e.key || '').toLowerCase();
+
+  if (mod && !e.shiftKey && !e.altKey) {
+    if (k === 'b') { e.preventDefault(); mdEditorWrapSel(ta, '**', '**', '加粗文字', onAfter); return; }
+    if (k === 'i') { e.preventDefault(); mdEditorWrapSel(ta, '*', '*', '斜体文字', onAfter); return; }
+    if (k === 'h') { e.preventDefault(); mdEditorWrapSel(ta, '==', '==', '重点高亮', onAfter); return; }
+    if (k === 'e') { e.preventDefault(); mdEditorWrapSel(ta, '`', '`', '代码', onAfter); return; }
+    if (k === 'm') { e.preventDefault(); mdEditorWrapSel(ta, '$', '$', 'x^2', onAfter); return; }
+  }
+  if (mod && e.shiftKey && !e.altKey) {
+    if (k === 'm' && typeof openMathStudio === 'function') {
+      e.preventDefault();
+      openMathStudio(ta.id, 'formula');
+      return;
+    }
+    if (k === 'x' && typeof openMathStudio === 'function') {
+      e.preventDefault();
+      openMathStudio(ta.id, 'matrix');
+      return;
+    }
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    mdEditorHandleIndent(ta, e.shiftKey, onAfter);
+    return;
+  }
+  if (e.key === 'Enter') {
+    if (mdEditorHandleSmartEnter(e, ta, onAfter)) return;
+  }
+  // 选中文字时按 $ / * / ` / = 自动成对包裹
+  if (!mod && !e.altKey && ta.selectionStart !== ta.selectionEnd) {
+    if (e.key === '$' || e.key === '*' || e.key === '`') {
+      e.preventDefault();
+      mdEditorWrapSel(ta, e.key, e.key, '', onAfter);
+      return;
+    }
+    if (e.key === '=') {
+      e.preventDefault();
+      mdEditorWrapSel(ta, '==', '==', '', onAfter);
+    }
+  }
+}
+
+// 编辑器全屏/还原写作空间切换
+function toggleModalEditorFullscreen(panelId, btnId, forceState = null) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  const next = typeof forceState === 'boolean' ? forceState : !panel.classList.contains('md-fullscreen');
+  panel.classList.toggle('md-fullscreen', next);
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.classList.toggle('md-tab-active', next);
+    btn.textContent = next ? '🗗 还原' : '⛶ 放大';
+    btn.title = next ? '还原默认弹窗大小' : '放大写作空间';
+  }
+}
+
+// 用 before/after 包裹选区（无选区时插入 placeholder）
+function recNoteWrapSel(before, after, placeholder) {
+  mdEditorWrapSel(document.getElementById('rec-note'), before, after, placeholder, recNoteLivePreview);
+}
+
+// 在光标处插入文本
+function recNoteInsert(text) {
+  mdEditorInsert(document.getElementById('rec-note'), text, recNoteLivePreview);
+}
+
+// 给选区内每行加前缀（标题 / 列表 / 引用）；autoNum=true 时生成 1. 2. 3.
+function recNotePrefixLines(prefix, autoNum) {
+  mdEditorPrefixLines(document.getElementById('rec-note'), prefix, autoNum, recNoteLivePreview);
+}
+
+// 备注编辑区快捷键：Ctrl+B/I/H/E/M、Ctrl+Shift+M/X、Tab/Shift+Tab、Enter 续行、成对包裹
+function recNoteKeydown(e) {
+  mdEditorHandleKeydown(e, document.getElementById('rec-note'), recNoteLivePreview);
 }

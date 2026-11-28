@@ -267,7 +267,7 @@ async function incrementForget(mod, id) {
   if (!Array.isArray(rec.forgetEvents)) rec.forgetEvents = [];
   rec.forgetEvents.push(Date.now());
   if (rec.status === '已掌握') rec.status = '复习中';
-  await persistData(true);
+  await persistModule(mod, true);
   renderRecords(mod, id);
   showToast(`「${rec.topic}」遗忘次数 +1（当前 ${rec.forgetCount} 次）`, 'info');
 }
@@ -278,7 +278,7 @@ async function changeRecordStatus(mod, id, newStatus) {
   const rec = appData[mod].records.find(r => r.id === id);
   if (!rec) return;
   rec.status = newStatus;
-  await persistData(true);
+  await persistModule(mod, true);
   renderRecords(mod);
 }
 
@@ -297,7 +297,7 @@ async function deleteRecord(mod, id) {
 
   await createSnapshot(`删除薄弱点前备份`);
   appData[mod].records = appData[mod].records.filter(r => r.id !== id);
-  await persistData(true);
+  await persistModule(mod, true);
   renderRecords(mod);
   showToast('已删除记录（可通过历史快照恢复）', 'info');
 }
@@ -318,16 +318,94 @@ async function pushRecordToTodo(mod, id) {
     note: rec.note || `来源：${rec.source || '薄弱点追踪'}`,
     createdAt: Date.now()
   });
-  await persistData(true);
+  await persistModule('todos', true);
   renderTodos();
   showToast(`已将「${rec.topic}」加入今日待办`, 'success');
 }
 
 
+let recordModalInitialSnap = '';
+let recordDraftTimer = null;
+let recordDraftListenerBound = false;
+
+function getRecordModalSnapshot() {
+  return {
+    mod: document.getElementById('rec-module').value,
+    id: document.getElementById('rec-id').value,
+    subject: document.getElementById('rec-subject').value,
+    type: document.getElementById('rec-type').value,
+    topic: document.getElementById('rec-topic').value,
+    source: document.getElementById('rec-source').value,
+    status: document.getElementById('rec-status').value,
+    forgetCount: document.getElementById('rec-forgetCount').value,
+    date: document.getElementById('rec-date').value,
+    note: document.getElementById('rec-note').value
+  };
+}
+
+function getRecordDraftKey(mod, id) {
+  return `rec_${mod || 'math'}_${id || 'new'}`;
+}
+
+function scheduleRecordDraftSave() {
+  clearTimeout(recordDraftTimer);
+  recordDraftTimer = setTimeout(() => {
+    const modal = document.getElementById('recordModal');
+    if (!modal || !modal.classList.contains('open')) return;
+    const snap = getRecordModalSnapshot();
+    const key = getRecordDraftKey(snap.mod, snap.id);
+    if (JSON.stringify(snap) !== recordModalInitialSnap && (snap.topic.trim() || snap.note.trim())) {
+      saveEditorDraft(key, snap);
+    }
+  }, 450);
+}
+
+function bindRecordDraftAutoSave() {
+  if (recordDraftListenerBound) return;
+  const modal = document.getElementById('recordModal');
+  if (!modal) return;
+  recordDraftListenerBound = true;
+  modal.addEventListener('input', scheduleRecordDraftSave);
+  modal.addEventListener('change', scheduleRecordDraftSave);
+}
+
+function restoreRecordDraft() {
+  const mod = document.getElementById('rec-module').value;
+  const id = document.getElementById('rec-id').value;
+  const draft = loadEditorDraft(getRecordDraftKey(mod, id));
+  if (!draft || !draft.payload) return;
+  const p = draft.payload;
+  const subSel = document.getElementById('rec-subject');
+  if (p.subject && [...subSel.options].some(o => o.value === p.subject)) subSel.value = p.subject;
+  if (p.type) document.getElementById('rec-type').value = p.type;
+  document.getElementById('rec-topic').value = p.topic || '';
+  document.getElementById('rec-source').value = p.source || '';
+  if (p.status) document.getElementById('rec-status').value = p.status;
+  if (p.forgetCount) document.getElementById('rec-forgetCount').value = p.forgetCount;
+  if (p.date) document.getElementById('rec-date').value = p.date;
+  document.getElementById('rec-note').value = p.note || '';
+  if (typeof recNoteRefreshPreview === 'function') recNoteRefreshPreview();
+  const banner = document.getElementById('rec-draft-banner');
+  if (banner) banner.classList.add('hidden');
+  showToast('已恢复上次未保存的草稿', 'success');
+}
+
+function dismissRecordDraft() {
+  const mod = document.getElementById('rec-module').value;
+  const id = document.getElementById('rec-id').value;
+  clearEditorDraft(getRecordDraftKey(mod, id));
+  const banner = document.getElementById('rec-draft-banner');
+  if (banner) banner.classList.add('hidden');
+}
+
 // 打开“新增/编辑薄弱点”弹窗并回填字段
 function openRecordModal(mod, id = '') {
+  bindRecordDraftAutoSave();
   document.getElementById('rec-module').value = mod;
   document.getElementById('rec-id').value = id;
+  if (typeof toggleModalEditorFullscreen === 'function') {
+    toggleModalEditorFullscreen('recordModalPanel', 'rec-note-fullscreen-btn', false);
+  }
   recNoteSwitchTab('split'); // 每次打开备注编辑器都回到「分屏实时渲染」
 
   const subSel = document.getElementById('rec-subject');
@@ -357,14 +435,41 @@ function openRecordModal(mod, id = '') {
     document.getElementById('rec-note').value = '';
     document.getElementById('rec-forget-history-wrap').classList.add('hidden');
   }
+  recordModalInitialSnap = JSON.stringify(getRecordModalSnapshot());
+
+  // 检查是否存在上次未保存草稿
+  const draft = loadEditorDraft(getRecordDraftKey(mod, id));
+  const banner = document.getElementById('rec-draft-banner');
+  const timeEl = document.getElementById('rec-draft-time');
+  if (banner) {
+    if (draft && draft.payload && JSON.stringify(draft.payload) !== recordModalInitialSnap) {
+      if (timeEl) timeEl.textContent = formatDateTime(draft.savedAt);
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
   document.getElementById('recordModal').classList.add('open');
   setTimeout(() => document.getElementById('rec-topic').focus(), 100);
 }
 
 
-// 关闭薄弱点编辑弹窗
-function closeRecordModal() {
-  document.getElementById('recordModal').classList.remove('open');
+// 关闭薄弱点编辑弹窗（有未保存改动时二次确认，防误丢）
+async function closeRecordModal(force = false) {
+  const modal = document.getElementById('recordModal');
+  if (!modal || !modal.classList.contains('open')) return;
+  const curSnap = getRecordModalSnapshot();
+  if (!force && JSON.stringify(curSnap) !== recordModalInitialSnap) {
+    const ok = await confirmDiscardEdits('薄弱点编辑');
+    if (!ok) return;
+    clearEditorDraft(getRecordDraftKey(curSnap.mod, curSnap.id));
+  }
+  clearTimeout(recordDraftTimer);
+  if (typeof toggleModalEditorFullscreen === 'function') {
+    toggleModalEditorFullscreen('recordModalPanel', 'rec-note-fullscreen-btn', false);
+  }
+  modal.classList.remove('open');
 }
 
 
@@ -411,8 +516,9 @@ async function saveRecordModal() {
     });
   }
 
-  closeRecordModal();
-  await persistData(true);
+  clearEditorDraft(getRecordDraftKey(mod, id));
+  await closeRecordModal(true);
+  await persistModule(mod, true);
   renderRecords(mod);
   showToast(id ? '已更新薄弱点记录' : '已添加新的薄弱点', 'success');
 }

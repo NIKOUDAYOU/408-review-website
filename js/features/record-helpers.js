@@ -4,44 +4,100 @@
 // =========================================================================
 // 3.5 分页辅助 & 遗忘事件时间戳
 // =========================================================================
+function renderPaginatedModule(mod) {
+  if (mod === 'politics') {
+    if (typeof renderPolitics === 'function') renderPolitics();
+  } else if (mod === 'papers') {
+    if (typeof renderPapers === 'function') renderPapers();
+  } else {
+    renderRecords(mod);
+  }
+}
+
+
+function scrollPaginatedModuleTop(mod) {
+  const id = mod === 'papers' ? 'papers-container' : `records-container-${mod}`;
+  const container = document.getElementById(id);
+  if (!container) return;
+  const top = container.getBoundingClientRect().top;
+  if (top < 90) {
+    window.scrollTo({ top: Math.max(0, window.scrollY + top - 96), behavior: 'smooth' });
+  }
+}
+
+
 function onRecordFilterChange(mod) {
-  pageState[mod].page = 1;
-  renderRecords(mod);
+  if (pageState[mod]) pageState[mod].page = 1;
+  renderPaginatedModule(mod);
 }
 
 
 // 跳转到指定页并重渲染当前科目记录
 function gotoPage(mod, p) {
+  if (!pageState[mod]) return;
   pageState[mod].page = Math.max(1, p);
-  renderRecords(mod);
+  renderPaginatedModule(mod);
+  scrollPaginatedModuleTop(mod);
 }
 
 
-// 切换每页条数，重置到第一页后重渲染
+// 切换每页条数（上限 10 条），重置到第一页后重渲染
 function changePageSize(mod, size) {
-  pageState[mod].size = parseInt(size, 10) || 20;
+  if (!pageState[mod]) return;
+  pageState[mod].size = normalizeCardPageSize(size);
   pageState[mod].page = 1;
   savePrefs();
-  renderRecords(mod);
+  renderPaginatedModule(mod);
 }
 
 
-// 渲染分页控件（上一页/页码/下一页 + 总数信息）
+function buildPaginationPages(current, totalPages) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const pages = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(totalPages - 1, current + 1);
+  if (start > 2) pages.push('...');
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < totalPages - 1) pages.push('...');
+  pages.push(totalPages);
+  return pages;
+}
+
+
+// 渲染分页控件（每页 5/10 条 + 上一页/页码/下一页 + 总数信息）
 function renderPaginationBar(mod, total, totalPages, el) {
-  if (totalPages <= 1) { el.innerHTML = ''; return; }
   const ps = pageState[mod];
-  const sizeOpts = [20, 50, 100].map(s => `<option value="${s}" ${ps.size === s ? 'selected' : ''}>${s}</option>`).join('');
+  if (!ps || !el) return;
+  if (totalPages <= 1 && ps.size >= MAX_CARD_PAGE_SIZE) { el.innerHTML = ''; return; }
+  const sizeOpts = CARD_PAGE_SIZE_OPTIONS.map(s => `<option value="${s}" ${ps.size === s ? 'selected' : ''}>${s}</option>`).join('');
+  const activeBtnCls = mod === 'politics'
+    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+    : (mod === 'papers'
+      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+      : 'bg-blue-600 text-white border-blue-600 shadow-xs');
+  const pageBtns = totalPages > 1
+    ? buildPaginationPages(ps.page, totalPages).map(item => {
+        if (item === '...') {
+          return '<span class="px-1.5 text-xs text-slate-400 select-none">…</span>';
+        }
+        const isActive = item === ps.page;
+        return `<button onclick="gotoPage('${mod}', ${item})" ${isActive ? 'aria-current="page"' : ''} class="btn-tactile min-w-[32px] h-8 px-2 rounded-lg text-xs font-semibold border transition-colors ${isActive ? activeBtnCls : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">${item}</button>`;
+      }).join('')
+    : '';
   el.innerHTML = `
     <div class="flex flex-wrap items-center justify-between gap-3 bg-white/95 backdrop-blur border border-slate-200/90 rounded-2xl shadow-sm px-4 py-3">
       <div class="flex items-center gap-2 text-sm text-slate-600">
         <span>每页</span>
         <select onchange="changePageSize('${mod}', this.value)" class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/70 text-sm focus:border-blue-500 outline-none">${sizeOpts}</select>
-        <span>条 · 共 <b class="text-slate-800">${total}</b> 条</span>
+        <span>张 · 共 <b class="text-slate-800">${total}</b> 张</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-1.5">
         <button onclick="gotoPage('${mod}', ${ps.page - 1})" ${ps.page <= 1 ? 'disabled' : ''} class="btn-tactile px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">← 上一页</button>
-        <span class="text-sm font-semibold text-slate-700 tabular-nums">第 ${ps.page} / ${totalPages} 页</span>
+        ${pageBtns}
         <button onclick="gotoPage('${mod}', ${ps.page + 1})" ${ps.page >= totalPages ? 'disabled' : ''} class="btn-tactile px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页 →</button>
+        <span class="ml-1 text-xs font-semibold text-slate-500 tabular-nums">第 ${ps.page} / ${totalPages} 页</span>
       </div>
     </div>`;
 }

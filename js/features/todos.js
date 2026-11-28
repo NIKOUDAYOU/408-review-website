@@ -46,7 +46,7 @@ async function quickAddTodo() {
 
   titleEl.value = '';
   document.getElementById('quick-todo-note').value = '';
-  await persistData(true);
+  await persistModule('todos', true);
   renderTodos();
   showToast('已添加待办事项', 'success');
 }
@@ -57,7 +57,7 @@ async function toggleTodoComplete(id) {
   const todo = appData.todos.find(t => t.id === id);
   if (!todo) return;
   todo.completed = !todo.completed;
-  await persistData(true);
+  await persistModule('todos', true);
   renderTodos(id);
 }
 
@@ -68,7 +68,7 @@ async function postponeTodoToTomorrow(id) {
   if (!todo) return;
   // 直接在待办自身日期上加一天：22 号没完成顺延到 23 号，而不是今天(23)的明天
   todo.dateStr = addDaysISO(todo.dateStr, 1);
-  await persistData(true);
+  await persistModule('todos', true);
   renderTodos();
   showToast(`已顺延至 ${isoToSlash(todo.dateStr)}`, 'info');
 }
@@ -78,11 +78,25 @@ async function postponeTodoToTomorrow(id) {
 async function deleteTodo(id) {
   await createSnapshot('删除待办前备份');
   appData.todos = appData.todos.filter(t => t.id !== id);
-  await persistData(true);
+  await persistModule('todos', true);
   renderTodos();
   showToast('已删除待办（可在历史快照中找回）', 'info');
 }
 
+
+let todoModalInitialSnap = '';
+
+function getTodoModalSnapshot() {
+  return JSON.stringify({
+    id: document.getElementById('edit-todo-id').value,
+    date: document.getElementById('edit-todo-date').value,
+    cat: document.getElementById('edit-todo-cat').value,
+    title: document.getElementById('edit-todo-title').value,
+    priority: document.getElementById('edit-todo-priority').value,
+    completed: document.getElementById('edit-todo-completed').value,
+    note: document.getElementById('edit-todo-note').value
+  });
+}
 
 // 打开待办编辑弹窗并回填字段
 function openTodoModal(id) {
@@ -95,13 +109,20 @@ function openTodoModal(id) {
   document.getElementById('edit-todo-priority').value = todo.priority || '中';
   document.getElementById('edit-todo-completed').value = String(Boolean(todo.completed));
   document.getElementById('edit-todo-note').value = todo.note || '';
+  todoModalInitialSnap = getTodoModalSnapshot();
   document.getElementById('todoModal').classList.add('open');
 }
 
 
-// 关闭待办编辑弹窗
-function closeTodoModal() {
-  document.getElementById('todoModal').classList.remove('open');
+// 关闭待办编辑弹窗（有未保存改动时确认）
+async function closeTodoModal(force = false) {
+  const modal = document.getElementById('todoModal');
+  if (!modal || !modal.classList.contains('open')) return;
+  if (!force && getTodoModalSnapshot() !== todoModalInitialSnap) {
+    const ok = await confirmDiscardEdits('待办编辑');
+    if (!ok) return;
+  }
+  modal.classList.remove('open');
 }
 
 
@@ -122,8 +143,8 @@ async function saveTodoModal() {
     todo.completed = document.getElementById('edit-todo-completed').value === 'true';
     todo.note = document.getElementById('edit-todo-note').value.trim();
   }
-  closeTodoModal();
-  await persistData(true);
+  await closeTodoModal(true);
+  await persistModule('todos', true);
   renderTodos();
   showToast('已保存待办修改', 'success');
 }
